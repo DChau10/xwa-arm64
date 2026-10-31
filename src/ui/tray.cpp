@@ -567,7 +567,7 @@ static LRESULT CALLBACK TrayWndProc(HWND hwnd, UINT msg, WPARAM wParam, LPARAM l
 
             if (g_driverUiState == DriverUiState::DriverMissing)
             {
-                AppendMenuW(hMenu, MF_STRING, IDM_INSTALL_DRIVER, L"⚡ Install WinUSB Driver (One-Click Setup)...");
+                AppendMenuW(hMenu, MF_STRING, IDM_INSTALL_DRIVER, L"⚡ Configure WinUSB in Device Manager...");
             }
 
             AppendMenuW(hMenu, MF_SEPARATOR, 0, NULL);

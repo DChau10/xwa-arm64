@@ -7,16 +7,9 @@
 #include <setupapi.h>
 #include <commctrl.h>
 #include <shellapi.h>
-#include <shlobj.h>
-#include <fstream>
-#include <sstream>
 
 #pragma comment(lib, "setupapi.lib")
 #pragma comment(lib, "comctl32.lib")
-
-// Official Zadig 2.9 release from https://github.com/pbatard/libwdi/releases/download/v1.5.1/zadig-2.9.exe
-static const wchar_t *ZADIG_DOWNLOAD_URL = L"https://github.com/pbatard/libwdi/releases/download/v1.5.1/zadig-2.9.exe";
-static const char *ZADIG_SHA256 = "4ECAA95DF3DA3621486A043AEF8B3050B8BAFE7C901402871E816229EF82039B";
 
 AdapterDriverStatus checkAdapterDriverStatus(std::wstring *outDesc, std::wstring *outHardwareId)
 {
@@ -81,55 +74,6 @@ AdapterDriverStatus checkAdapterDriverStatus(std::wstring *outDesc, std::wstring
     return result;
 }
 
-static bool verifyFileHash(const std::wstring &filePath, const std::string &expectedHex)
-{
-    std::ifstream stream(filePath, std::ios::binary);
-    if (!stream.is_open())
-    {
-        return false;
-    }
-
-    std::vector<uint8_t> buffer((std::istreambuf_iterator<char>(stream)), std::istreambuf_iterator<char>());
-    if (buffer.empty())
-    {
-        return false;
-    }
-
-    std::string actualHex;
-    if (!calculateSha256(buffer.data(), buffer.size(), actualHex))
-    {
-        return false;
-    }
-    return (_stricmp(actualHex.c_str(), expectedHex.c_str()) == 0);
-}
-
-static bool downloadFile(const std::wstring &url, const std::wstring &destPath)
-{
-    std::wstring cmd = L"powershell.exe -NoProfile -NonInteractive -ExecutionPolicy Bypass -Command "
-                       L"\"[Net.ServicePointManager]::SecurityProtocol = [Net.SecurityProtocolType]::Tls12; "
-                       L"(New-Object Net.WebClient).DownloadFile('" + url + L"', '" + destPath + L"')\"";
-
-    STARTUPINFOW si = {};
-    si.cb = sizeof(si);
-    si.dwFlags = STARTF_USESHOWWINDOW;
-    si.wShowWindow = SW_HIDE;
-
-    PROCESS_INFORMATION pi = {};
-    if (!CreateProcessW(NULL, const_cast<LPWSTR>(cmd.c_str()), NULL, NULL, FALSE, CREATE_NO_WINDOW, NULL, NULL, &si, &pi))
-    {
-        return false;
-    }
-
-    WaitForSingleObject(pi.hProcess, 60000);
-
-    DWORD exitCode = 1;
-    GetExitCodeProcess(pi.hProcess, &exitCode);
-    CloseHandle(pi.hProcess);
-    CloseHandle(pi.hThread);
-
-    return (exitCode == 0 && GetFileAttributesW(destPath.c_str()) != INVALID_FILE_ATTRIBUTES);
-}
-
 bool promptAndInstallWinUsb(HWND hParent)
 {
     std::wstring deviceDesc, hwId;
@@ -139,156 +83,41 @@ bool promptAndInstallWinUsb(HWND hParent)
     {
         MessageBoxW(
             hParent,
-            L"The Xbox Wireless Adapter is already properly configured with the WinUSB driver and ready for use.",
-            L"xwa-arm64: Driver Ready",
+            L"The Xbox Wireless Adapter is already properly configured with Microsoft's in-box WinUSB driver and ready for use.",
+            L"xwa-arm64: WinUSB Ready",
             MB_OK | MB_ICONINFORMATION
         );
         return true;
     }
 
-    if (status == AdapterDriverStatus::NOT_PRESENT)
-    {
-        int res = MessageBoxW(
-            hParent,
-            L"No Xbox Wireless Adapter was detected. Please plug in your Xbox Wireless USB Adapter and try again.\n\n"
-            L"Would you still like to open the driver setup tool?",
-            L"xwa-arm64: Adapter Not Found",
-            MB_YESNO | MB_ICONWARNING
-        );
-        if (res != IDYES)
-        {
-            return false;
-        }
-    }
-    else
-    {
-        std::wstring msg = L"Xbox Wireless Adapter ('" + deviceDesc + L"') was detected, but the required WinUSB driver is missing (Code 28).\n\n"
-                           L"xwa-arm64 can download the official driver setup tool (Zadig, cryptographically verified with SHA-256) and launch it to configure WinUSB for your adapter in one click.\n\n"
-                           L"Would you like to configure the WinUSB driver now?";
+    std::wstring adapterName = deviceDesc.empty() ? L"XBOX ACC" : deviceDesc;
 
-        int res = MessageBoxW(
-            hParent,
-            msg.c_str(),
-            L"xwa-arm64: WinUSB Driver Required",
-            MB_YESNO | MB_ICONQUESTION | MB_DEFBUTTON1
-        );
-        if (res != IDYES)
-        {
-            return false;
-        }
-    }
+    std::wstring message =
+        L"Xbox Wireless Adapter ('" + adapterName + L"') is connected, "
+        L"but requires Microsoft's native WinUSB driver to work with xwa-arm64 on ARM64.\n\n"
+        L"You can configure this directly using Windows Device Manager (100% native, no third-party tools):\n\n"
+        L"1. Click 'Yes' below to open Device Manager.\n"
+        L"2. Right-click '" + adapterName + L"' (under 'Other devices' or 'Universal Serial Bus') -> 'Update driver'.\n"
+        L"3. Click 'Browse my computer for drivers'.\n"
+        L"4. Click 'Let me pick from a list of available drivers on my computer'.\n"
+        L"5. Select 'Universal Serial Bus devices' -> click Next.\n"
+        L"6. Select Manufacturer: 'WinUsb Device', Model: 'WinUsb Device'.\n"
+        L"7. Click Next, confirm the prompt, and finish.\n\n"
+        L"xwa-arm64 will automatically detect the adapter as soon as you finish!\n\n"
+        L"Would you like to open Device Manager now?";
 
-    // Determine storage location in %LOCALAPPDATA%\xwa-arm64
-    wchar_t localAppData[MAX_PATH] = { 0 };
-    if (FAILED(SHGetFolderPathW(NULL, CSIDL_LOCAL_APPDATA, NULL, 0, localAppData)))
-    {
-        wcscpy_s(localAppData, L"C:\\Temp");
-    }
-
-    std::wstring dirPath = std::wstring(localAppData) + L"\\xwa-arm64";
-    CreateDirectoryW(dirPath.c_str(), NULL);
-
-    std::wstring zadigExePath = dirPath + L"\\zadig-2.9.exe";
-    std::wstring zadigIniPath = dirPath + L"\\zadig.ini";
-    std::wstring zadigCfgPath = dirPath + L"\\zadig_preset.cfg";
-
-    // Download Zadig if needed
-    if (!verifyFileHash(zadigExePath, ZADIG_SHA256))
-    {
-        Log::info("Downloading official Zadig driver utility from %ls...", ZADIG_DOWNLOAD_URL);
-        if (!downloadFile(ZADIG_DOWNLOAD_URL, zadigExePath))
-        {
-            MessageBoxW(
-                hParent,
-                L"Failed to download Zadig driver setup tool. Please check your internet connection.",
-                L"xwa-arm64: Download Error",
-                MB_OK | MB_ICONERROR
-            );
-            return false;
-        }
-
-        if (!verifyFileHash(zadigExePath, ZADIG_SHA256))
-        {
-            DeleteFileW(zadigExePath.c_str());
-            MessageBoxW(
-                hParent,
-                L"Security validation failed: Downloaded driver installer does not match expected cryptographic hash.",
-                L"xwa-arm64: Security Error",
-                MB_OK | MB_ICONERROR
-            );
-            return false;
-        }
-        Log::info("Zadig binary verified successfully (SHA-256: %s)", ZADIG_SHA256);
-    }
-
-    // Write pre-configured zadig.ini
-    std::ofstream iniFile(zadigIniPath);
-    if (iniFile.is_open())
-    {
-        iniFile << "[general]\n"
-                << "  advanced_mode = false\n"
-                << "  exit_on_success = true\n"
-                << "  log_level = 1\n\n"
-                << "[device]\n"
-                << "  list_all = true\n"
-                << "  include_hubs = false\n"
-                << "  trim_whitespaces = true\n\n"
-                << "[driver]\n"
-                << "  default_driver = 0\n"; // 0 = WinUSB
-        iniFile.close();
-    }
-
-    // Write preset configuration targeting Xbox adapter VID/PID
-    std::ofstream cfgFile(zadigCfgPath);
-    if (cfgFile.is_open())
-    {
-        cfgFile << "[device]\n"
-                << "  Description = \"Xbox Wireless Adapter (WinUSB)\"\n"
-                << "  VID = 0x045E\n"
-                << "  PID = 0x02FE\n";
-        cfgFile.close();
-    }
-
-    // Launch Zadig elevated
-    SHELLEXECUTEINFOW sei = {};
-    sei.cbSize = sizeof(sei);
-    sei.fMask = SEE_MASK_NOCLOSEPROCESS;
-    sei.hwnd = hParent;
-    sei.lpVerb = L"runas";
-    sei.lpFile = zadigExePath.c_str();
-    sei.lpDirectory = dirPath.c_str();
-    sei.nShow = SW_SHOWNORMAL;
-
-    if (!ShellExecuteExW(&sei))
-    {
-        DWORD err = GetLastError();
-        if (err != ERROR_CANCELLED) // User didn't just cancel UAC
-        {
-            MessageBoxW(
-                hParent,
-                L"Unable to launch driver installer with administrator privileges.",
-                L"xwa-arm64: Elevation Error",
-                MB_OK | MB_ICONERROR
-            );
-        }
-        return false;
-    }
-
-    if (sei.hProcess)
-    {
-        CloseHandle(sei.hProcess);
-    }
-
-    MessageBoxW(
+    int res = MessageBoxW(
         hParent,
-        L"Driver installer opened!\n\n"
-        L"1. Ensure 'XBOX ACC' or 'Xbox Wireless Adapter' is selected in the list.\n"
-        L"2. Ensure the target driver is 'WinUSB'.\n"
-        L"3. Click 'Install Driver' (or 'Replace Driver').\n\n"
-        L"xwa-arm64 will automatically detect the adapter as soon as installation completes.",
-        L"xwa-arm64: Driver Setup In Progress",
-        MB_OK | MB_ICONINFORMATION
+        message.c_str(),
+        L"xwa-arm64: Native WinUSB Driver Setup",
+        MB_YESNO | MB_ICONINFORMATION | MB_DEFBUTTON1
     );
 
-    return true;
+    if (res == IDYES)
+    {
+        ShellExecuteW(NULL, L"open", L"devmgmt.msc", NULL, NULL, SW_SHOWNORMAL);
+        return true;
+    }
+
+    return false;
 }
