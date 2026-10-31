@@ -2,6 +2,8 @@
 #include "utils/log.h"
 #include "dongle/usb.h"
 #include "dongle/dongle.h"
+#include "ui/settings.h"
+#include "ui/tray.h"
 
 #include <iostream>
 #include <atomic>
@@ -46,6 +48,8 @@ int main(int argc, char *argv[])
     Log::info("==================================================");
 
     bool requestPair = false;
+    bool requestSettings = false;
+    bool hideConsole = false;
 
     for (int i = 1; i < argc; ++i)
     {
@@ -54,14 +58,63 @@ int main(int argc, char *argv[])
         {
             requestPair = true;
         }
+        else if (arg == "--settings" || arg == "-s")
+        {
+            requestSettings = true;
+        }
+        else if (arg == "--hide")
+        {
+            hideConsole = true;
+        }
         else if (arg == "--help" || arg == "-h")
         {
             std::cout << "Usage: xow-win [OPTIONS]\n"
                       << "Options:\n"
                       << "  -p, --pair      Enable wireless pairing mode on startup\n"
+                      << "  -s, --settings  Open settings window on startup\n"
+                      << "  --hide          Hide console window and run quietly in tray\n"
                       << "  -h, --help      Display this help message\n";
             return 0;
         }
+    }
+
+#if defined(_WIN32)
+    if (hideConsole)
+    {
+        HWND hConsole = GetConsoleWindow();
+        if (hConsole)
+        {
+            ShowWindow(hConsole, SW_HIDE);
+        }
+    }
+#endif
+
+    // 1. Load configuration
+    setGlobalSettings(Settings::load());
+
+    // 2. Initialize System Tray
+    SystemTray::getInstance().init(
+        GetModuleHandle(NULL),
+        []() {
+            if (g_currentDongle)
+            {
+                Log::info("Pairing mode initiated via System Tray");
+                g_currentDongle->setPairingStatus(true);
+            }
+            else
+            {
+                Log::info("Dongle not connected, cannot pair");
+            }
+        },
+        []() {
+            Log::info("Exit requested via System Tray");
+            g_running = false;
+        }
+    );
+
+    if (requestSettings)
+    {
+        SystemTray::getInstance().showSettingsDialog();
     }
 
 #if defined(_WIN32)
@@ -77,6 +130,8 @@ int main(int argc, char *argv[])
     {
         try
         {
+            SystemTray::getInstance().updateStatus(false, false, "none");
+
             std::unique_ptr<UsbDevice> device = manager.getDevice({
                 { DONGLE_VID, DONGLE_PID_OLD },
                 { DONGLE_VID, DONGLE_PID_NEW },
@@ -84,6 +139,7 @@ int main(int argc, char *argv[])
                 { DONGLE_VID, DONGLE_PID_SURFACE }
             }, [&]() {
                 Log::info("Dongle unplugged / disconnected");
+                SystemTray::getInstance().updateStatus(false, false, "none");
             });
 
             if (!device || !g_running)
@@ -94,6 +150,8 @@ int main(int argc, char *argv[])
             Dongle dongle(std::move(device));
             g_currentDongle = &dongle;
 
+            SystemTray::getInstance().updateStatus(true, false, "none");
+
             if (requestPair)
             {
                 Log::info("Enabling pairing mode...");
@@ -103,10 +161,11 @@ int main(int argc, char *argv[])
 
             Log::info("Dongle is active and listening for controllers.");
 
-            // Keep main thread alive while dongle is running
+            // Keep main thread alive while dongle is running, dispatching tray messages
             while (g_running)
             {
-                std::this_thread::sleep_for(std::chrono::milliseconds(200));
+                SystemTray::getInstance().processMessages();
+                std::this_thread::sleep_for(std::chrono::milliseconds(50));
             }
 
             g_currentDongle = nullptr;
@@ -114,15 +173,22 @@ int main(int argc, char *argv[])
         catch (const std::exception &ex)
         {
             g_currentDongle = nullptr;
+            SystemTray::getInstance().updateStatus(false, false, "none");
             if (g_running)
             {
                 Log::error("Error: %s", ex.what());
                 Log::info("Retrying in 2 seconds...");
-                std::this_thread::sleep_for(std::chrono::seconds(2));
+
+                for (int i = 0; i < 40 && g_running; ++i)
+                {
+                    SystemTray::getInstance().processMessages();
+                    std::this_thread::sleep_for(std::chrono::milliseconds(50));
+                }
             }
         }
     }
 
+    SystemTray::getInstance().shutdown();
     Log::info("xow-win stopped.");
     return 0;
 }

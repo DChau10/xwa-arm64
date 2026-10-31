@@ -26,7 +26,7 @@ private:
     void statusReceived(uint8_t id, const StatusData *status) override;
     void guideButtonPressed(const GuideButtonData *button) override;
     void serialNumberReceived(const SerialData *serial) override;
-    void inputReceived(const InputData *input) override;
+    void inputReceived(const InputData *input, bool sharePressed = false) override;
 
     /* Device initialization */
     void initInput(const AnnounceData *announce);
@@ -48,4 +48,7 @@ private:
 
     uint8_t batteryLevel = 0xff;
     bool initialized = false;
+    bool shareWasPressed = false;
+    bool shareHoldTriggered = false;
+    std::chrono::steady_clock::time_point sharePressStartTime;
 };

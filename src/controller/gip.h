@@ -164,7 +164,7 @@ protected:
     virtual void statusReceived(uint8_t id, const StatusData *status) = 0;
     virtual void guideButtonPressed(const GuideButtonData *button) = 0;
     virtual void serialNumberReceived(const SerialData *serial) = 0;
-    virtual void inputReceived(const InputData *input) = 0;
+    virtual void inputReceived(const InputData *input, bool sharePressed = false) = 0;
 
     bool setPowerMode(uint8_t id, PowerMode mode);
     bool performRumble(RumbleData rumble);

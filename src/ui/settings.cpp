@@ -1,0 +1,135 @@
+#include "settings.h"
+#include "../utils/log.h"
+
+#define WIN32_LEAN_AND_MEAN
+#include <windows.h>
+#include <shlobj.h>
+#include <fstream>
+#include <sstream>
+#include <mutex>
+
+static Settings g_settings;
+static std::mutex g_settingsMutex;
+
+Settings &getGlobalSettings()
+{
+    std::lock_guard<std::mutex> lock(g_settingsMutex);
+    return g_settings;
+}
+
+void setGlobalSettings(const Settings &s)
+{
+    std::lock_guard<std::mutex> lock(g_settingsMutex);
+    g_settings = s;
+}
+
+std::string Settings::getDefaultConfigPath()
+{
+    char localAppData[MAX_PATH];
+    if (SUCCEEDED(SHGetFolderPathA(NULL, CSIDL_LOCAL_APPDATA, NULL, 0, localAppData)))
+    {
+        std::string dir = std::string(localAppData) + "\\xow-win";
+        CreateDirectoryA(dir.c_str(), NULL);
+        return dir + "\\settings.json";
+    }
+
+    return "settings.json";
+}
+
+static std::string trim(const std::string &s)
+{
+    size_t start = s.find_first_not_of(" \t\r\n\"");
+    if (start == std::string::npos) return "";
+    size_t end = s.find_last_not_of(" \t\r\n\"");
+    return s.substr(start, end - start + 1);
+}
+
+Settings Settings::load(const std::string &configPath)
+{
+    Settings s;
+    std::string path = configPath.empty() ? getDefaultConfigPath() : configPath;
+
+    // Check Windows Registry for GameDVR default overrides
+    HKEY hKey;
+    if (RegOpenKeyExW(HKEY_CURRENT_USER, L"Software\\Microsoft\\Windows\\CurrentVersion\\GameDVR", 0, KEY_READ, &hKey) == ERROR_SUCCESS)
+    {
+        DWORD keyVal = 0, modVal = 0, size = sizeof(DWORD);
+        if (RegQueryValueExW(hKey, L"CustomShortcut_TakeScreenshotKey", NULL, NULL, (LPBYTE)&keyVal, &size) == ERROR_SUCCESS && keyVal != 0)
+        {
+            size = sizeof(DWORD);
+            RegQueryValueExW(hKey, L"CustomShortcut_TakeScreenshotModifiers", NULL, NULL, (LPBYTE)&modVal, &size);
+            s.gameBarScreenshot.vkCode = static_cast<uint8_t>(keyVal);
+            s.gameBarScreenshot.win = (modVal & 0x08) != 0;
+            s.gameBarScreenshot.alt = (modVal & 0x01) != 0;
+            s.gameBarScreenshot.ctrl = (modVal & 0x02) != 0;
+            s.gameBarScreenshot.shift = (modVal & 0x04) != 0;
+        }
+
+        size = sizeof(DWORD);
+        if (RegQueryValueExW(hKey, L"CustomShortcut_RecordPreviousKey", NULL, NULL, (LPBYTE)&keyVal, &size) == ERROR_SUCCESS && keyVal != 0)
+        {
+            size = sizeof(DWORD);
+            RegQueryValueExW(hKey, L"CustomShortcut_RecordPreviousModifiers", NULL, NULL, (LPBYTE)&modVal, &size);
+            s.gameBarClip.vkCode = static_cast<uint8_t>(keyVal);
+            s.gameBarClip.win = (modVal & 0x08) != 0;
+            s.gameBarClip.alt = (modVal & 0x01) != 0;
+            s.gameBarClip.ctrl = (modVal & 0x02) != 0;
+            s.gameBarClip.shift = (modVal & 0x04) != 0;
+        }
+
+        RegCloseKey(hKey);
+    }
+
+    std::ifstream file(path);
+    if (!file.is_open())
+    {
+        Log::info("Generating initial settings file at %s", path.c_str());
+        s.save(path);
+        return s;
+    }
+
+    std::string line;
+    while (std::getline(file, line))
+    {
+        size_t colon = line.find(':');
+        if (colon == std::string::npos) continue;
+
+        std::string key = trim(line.substr(0, colon));
+        std::string val = trim(line.substr(colon + 1));
+        if (val.back() == ',') val.pop_back();
+        val = trim(val);
+
+        if (key == "enableShareButton") s.enableShareButton = (val == "true" || val == "1");
+        else if (key == "provider") s.provider = static_cast<CaptureProvider>(std::stoi(val));
+        else if (key == "tapAction") s.tapAction = static_cast<TapAction>(std::stoi(val));
+        else if (key == "holdAction") s.holdAction = static_cast<HoldAction>(std::stoi(val));
+        else if (key == "holdDurationMs") s.holdDurationMs = std::stoi(val);
+        else if (key == "hapticFeedback") s.hapticFeedback = (val == "true" || val == "1");
+    }
+
+    Log::info("Loaded settings from %s (Share Button: %s)", path.c_str(), s.enableShareButton ? "ENABLED" : "DISABLED");
+    return s;
+}
+
+bool Settings::save(const std::string &configPath) const
+{
+    std::string path = configPath.empty() ? getDefaultConfigPath() : configPath;
+    std::ofstream file(path);
+    if (!file.is_open())
+    {
+        Log::error("Failed to open settings file for writing: %s", path.c_str());
+        return false;
+    }
+
+    file << "{\n"
+         << "  \"enableShareButton\": " << (enableShareButton ? "true" : "false") << ",\n"
+         << "  \"provider\": " << static_cast<int>(provider) << ",\n"
+         << "  \"tapAction\": " << static_cast<int>(tapAction) << ",\n"
+         << "  \"holdAction\": " << static_cast<int>(holdAction) << ",\n"
+         << "  \"holdDurationMs\": " << holdDurationMs << ",\n"
+         << "  \"hapticFeedback\": " << (hapticFeedback ? "true" : "false") << "\n"
+         << "}\n";
+
+    Log::info("Saved settings to %s", path.c_str());
+    return true;
+}

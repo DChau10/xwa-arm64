@@ -114,7 +114,13 @@ bool GipDevice::handlePacket(const Bytes &packet)
         frame->length >= sizeof(InputData) &&
         data.size() >= sizeof(InputData)
     ) {
-        inputReceived(data.toStruct<InputData>());
+        bool sharePressed = false;
+        if (data.size() > 18)
+        {
+            sharePressed = (data[18] & 0x01) != 0;
+        }
+
+        inputReceived(data.toStruct<InputData>(), sharePressed);
     }
 
     // Ignore any unknown packets
