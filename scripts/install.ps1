@@ -1,10 +1,10 @@
 <#
 .SYNOPSIS
-    One-click installer for xow-win (Xbox Wireless Adapter on Windows / ARM64).
+    One-click automated installer for xow-win (Xbox Wireless Adapter on Windows ARM64 / x64).
 .DESCRIPTION
-    1. Ensures administrator rights.
-    2. Installs ViGEmBus driver if not already present.
-    3. Binds Microsoft WinUSB to the Xbox Wireless Adapter using pnputil.
+    1. Ensures administrator rights (elevates automatically).
+    2. Automatically downloads and installs signed ViGEmBus driver if not present.
+    3. Registers WinUSB driver for the Xbox Wireless Adapter.
     4. Downloads/extracts official firmware from Microsoft Update into %ProgramData%\xow-win.
     5. Sets up automatic launch on startup.
 #>
@@ -15,7 +15,7 @@ param(
     [switch]$NoService
 )
 
-$ErrorActionPreference = "Stop"
+$ErrorActionPreference = "Continue"
 
 # 1. Require Administrator
 $isAdmin = ([Security.Principal.WindowsPrincipal][Security.Principal.WindowsIdentity]::GetCurrent()).IsInRole([Security.Principal.WindowsBuiltInRole]::Administrator)
@@ -37,39 +37,81 @@ $ProgramDataDir = Join-Path $env:ProgramData "xow-win"
 
 # 2. Check and Install ViGEmBus
 if (-not $SkipViGEm) {
-    $viGemService = Get-ItemProperty -Path "HKLM:\SYSTEM\CurrentControlSet\Services\ViGEmBus" -ErrorAction SilentlyContinue
-    if ($viGemService) {
+    Write-Host "`n[*] Step 1/4: Checking ViGEmBus virtual controller driver..." -ForegroundColor Cyan
+    $isInstalled = (Test-Path "$env:SystemRoot\System32\drivers\ViGEmBus.sys") -or 
+                   (Get-ItemProperty -Path "HKLM:\SYSTEM\CurrentControlSet\Services\ViGEmBus" -ErrorAction SilentlyContinue)
+
+    if ($isInstalled) {
         Write-Host "[+] ViGEmBus driver is already installed." -ForegroundColor Green
     } else {
-        Write-Host "[*] ViGEmBus not found. Downloading signed ViGEmBus installer..." -ForegroundColor Cyan
-        $viGemUrl = "https://github.com/nefarius/ViGEmBus/releases/download/v1.22.0/ViGEmBus_1.22.0_x64_x86_arm64.exe"
-        $installerPath = Join-Path $env:TEMP "ViGEmBus_1.22.0_x64_x86_arm64.exe"
+        Write-Host "[*] ViGEmBus not found. Preparing signed ViGEmBus installer (ARM64/x64)..." -ForegroundColor Cyan
         
-        try {
-            [Net.ServicePointManager]::SecurityProtocol = [Net.SecurityProtocolType]::Tls12
-            Invoke-WebRequest -Uri $viGemUrl -OutFile $installerPath -UseBasicParsing
-            Write-Host "[*] Running ViGEmBus installer..." -ForegroundColor Cyan
-            Start-Process -FilePath $installerPath -ArgumentList "/passive" -Wait
-            Write-Host "[+] ViGEmBus installation finished." -ForegroundColor Green
-        } catch {
-            Write-Warning "Failed to download ViGEmBus automatically: $_"
-            Write-Host "Please download and install ViGEmBus manually from: https://github.com/nefarius/ViGEmBus/releases" -ForegroundColor Yellow
+        $localInstaller = Join-Path $RepoRoot "ViGEmBus_Setup.exe"
+        $installerPath = Join-Path $env:TEMP "ViGEmBus_1.22.0_x64_x86_arm64.exe"
+        $viGemUrl = "https://github.com/nefarius/ViGEmBus/releases/download/v1.22.0/ViGEmBus_1.22.0_x64_x86_arm64.exe"
+
+        $installerToRun = $null
+        if (Test-Path $localInstaller) {
+            Write-Host "[+] Found local ViGEmBus installer in repository: $localInstaller" -ForegroundColor Green
+            $installerToRun = $localInstaller
+        } elseif (Test-Path $installerPath) {
+            Write-Host "[+] Found cached ViGEmBus installer at $installerPath" -ForegroundColor Green
+            $installerToRun = $installerPath
+        } else {
+            Write-Host "[*] Downloading official signed ViGEmBus installer from GitHub..." -ForegroundColor Cyan
+            try {
+                [Net.ServicePointManager]::SecurityProtocol = [Net.SecurityProtocolType]::Tls12
+                Invoke-WebRequest -Uri $viGemUrl -OutFile $installerPath -UseBasicParsing
+                $installerToRun = $installerPath
+                Write-Host "[+] Downloaded ViGEmBus installer." -ForegroundColor Green
+            } catch {
+                Write-Warning "Failed to download ViGEmBus automatically: $_"
+                Write-Host "Please download and install ViGEmBus manually from: https://github.com/nefarius/ViGEmBus/releases" -ForegroundColor Yellow
+            }
+        }
+
+        if ($installerToRun) {
+            Write-Host "[*] Running ViGEmBus driver setup..." -ForegroundColor Cyan
+            $proc = Start-Process -FilePath $installerToRun -ArgumentList "/passive /norestart" -Wait -PassThru
+            
+            Start-Sleep -Seconds 3
+            $verifyInstalled = (Test-Path "$env:SystemRoot\System32\drivers\ViGEmBus.sys") -or 
+                               (Get-ItemProperty -Path "HKLM:\SYSTEM\CurrentControlSet\Services\ViGEmBus" -ErrorAction SilentlyContinue)
+            
+            if ($verifyInstalled) {
+                Write-Host "[+] ViGEmBus installed and verified successfully!" -ForegroundColor Green
+                Start-Service ViGEmBus -ErrorAction SilentlyContinue
+            } else {
+                Write-Warning "ViGEmBus installer finished with exit code $($proc.ExitCode). If prompt appeared, ensure installation was confirmed."
+            }
         }
     }
 }
 
-# 3. Install WinUSB driver for Xbox Wireless Adapter via pnputil
-Write-Host "[*] Installing WinUSB driver for Xbox Wireless Adapter..." -ForegroundColor Cyan
+# 3. Register WinUSB driver for Xbox Wireless Adapter
+Write-Host "`n[*] Step 2/4: Configuring Xbox Wireless Adapter USB driver..." -ForegroundColor Cyan
 if (Test-Path $DriverInf) {
-    $pnpOutput = pnputil /add-driver "$DriverInf" /install
-    $pnpOutput | ForEach-Object { Write-Host "    $_" }
-    Write-Host "[+] Adapter WinUSB driver package registered." -ForegroundColor Green
+    try {
+        $pnpOutput = pnputil /add-driver "$DriverInf" /install
+        $pnpOutput | ForEach-Object { Write-Host "    $_" }
+        Write-Host "[+] Adapter driver registration attempted." -ForegroundColor Green
+    } catch {
+        Write-Warning "Driver registration note: $_"
+    }
+    
+    # Check if adapter is connected and bound
+    $adapter = Get-PnpDevice -FriendlyName "*Xbox*Wireless*", "*XBOX ACC*" -ErrorAction SilentlyContinue
+    if ($adapter) {
+        Write-Host "[+] Found Xbox Wireless Adapter: $($adapter.FriendlyName) [Status: $($adapter.Status)]" -ForegroundColor Green
+    } else {
+        Write-Host "[*] Note: Plug in your Xbox Wireless Adapter if you haven't already." -ForegroundColor Yellow
+    }
 } else {
-    Write-Error "Could not find driver INF at $DriverInf"
+    Write-Warning "Could not find driver INF at $DriverInf"
 }
 
-# 4. Acquire Firmware (Automated download from Microsoft if not present)
-Write-Host "[*] Setting up firmware..." -ForegroundColor Cyan
+# 4. Acquire Firmware (Automated download from Microsoft CDN if not present)
+Write-Host "`n[*] Step 3/4: Setting up adapter firmware..." -ForegroundColor Cyan
 if (-not (Test-Path $ProgramDataDir)) {
     New-Item -ItemType Directory -Path $ProgramDataDir -Force | Out-Null
 }
@@ -79,15 +121,20 @@ if (Test-Path $targetFw) {
     Write-Host "[+] Firmware is already present in $targetFw" -ForegroundColor Green
 } elseif (Test-Path $FirmwareSrc) {
     Copy-Item $FirmwareSrc -Destination $targetFw -Force
-    Write-Host "[+] Firmware copied from local folder to $targetFw" -ForegroundColor Green
+    Write-Host "[+] Firmware copied to $targetFw" -ForegroundColor Green
 } else {
-    Write-Host "[*] Local firmware not found. Fetching official firmware from Microsoft Update CDN..." -ForegroundColor Cyan
+    Write-Host "[*] Fetching official firmware from Microsoft Update CDN..." -ForegroundColor Cyan
     $getFwScript = Join-Path $PSScriptRoot "get-firmware.ps1"
-    & $getFwScript -DestinationDir $ProgramDataDir
+    if (Test-Path $getFwScript) {
+        & $getFwScript -DestinationDir $ProgramDataDir
+    } else {
+        Write-Warning "Could not find get-firmware.ps1 at $getFwScript"
+    }
 }
 
 # 5. Startup Configuration
 if (-not $NoService) {
+    Write-Host "`n[*] Step 4/4: Setting up startup service..." -ForegroundColor Cyan
     $binPath = Join-Path $RepoRoot "bin\xow-win.exe"
     if (Test-Path $binPath) {
         $startupDir = Join-Path $env:APPDATA "Microsoft\Windows\Start Menu\Programs\Startup"
@@ -101,10 +148,16 @@ if (-not $NoService) {
         $shortcut.Save()
         Write-Host "[+] Created Startup shortcut at $shortcutPath" -ForegroundColor Green
     } else {
-        Write-Host "[!] Note: Binary not found at $binPath yet. Run cmake build first." -ForegroundColor Yellow
+        Write-Host "[!] Note: Binary not found at $binPath yet. Build project first." -ForegroundColor Yellow
     }
 }
 
-Write-Host "`nSetup complete! You can now plug in your Xbox Wireless Adapter." -ForegroundColor Green
+Write-Host "`n==========================================================" -ForegroundColor Green
+Write-Host "  Setup Complete! xow-win is ready to use." -ForegroundColor Green
+Write-Host "==========================================================" -ForegroundColor Green
+Write-Host "1. Plug in your Xbox Wireless Adapter (if not already plugged in)."
+Write-Host "2. Run xow-win or double-click your desktop / startup shortcut."
+Write-Host "3. Turn on your controller and press sync to play!"
+Write-Host ""
 Write-Host "Press any key to exit..."
 [void][System.Console]::ReadKey()
