@@ -1996,6 +1996,8 @@ bool Mt76::setLedMode(uint32_t index)
 
 bool Mt76::sendCommand(McuCommand command, const Bytes &data)
 {
+    std::lock_guard<std::mutex> lock(txMutex);
+
     // Values must be 32-bit aligned
     // 32 zero-bits mark the end
     uint32_t length = data.size();

@@ -69,6 +69,21 @@ void Controller::triggerFeedback(HapticPattern pattern)
 
 void Controller::feedbackWorker()
 {
+    auto pulseMotors = [this](uint8_t left, uint8_t right, int durationMs) {
+        RumbleData r = {};
+        r.motors = 0x0f;
+        r.left = left;
+        r.right = right;
+        r.duration = 0xff;
+        r.delay = 0;
+        r.repeat = 0xeb;
+        performRumble(r);
+
+        std::this_thread::sleep_for(std::chrono::milliseconds(durationMs));
+
+        stopRumble();
+    };
+
     while (!stopFeedbackThread)
     {
         HapticPattern pattern = HapticPattern::None;
@@ -89,11 +104,7 @@ void Controller::feedbackWorker()
                 pattern == HapticPattern::SuccessTier1 ||
                 pattern == HapticPattern::SuccessTier2)
             {
-                RumbleData r = {};
-                r.setLeft = true; r.setRight = true;
-                r.left = 50; r.right = 50;
-                r.duration = 8; // 80ms
-                performRumble(r);
+                pulseMotors(50, 50, 100);
             }
             continue;
         }
@@ -103,19 +114,14 @@ void Controller::feedbackWorker()
         case HapticPattern::NotchTier1:
         {
             // Crisp notch detent click at 1.0s
-            RumbleData r = {};
-            r.setRight = true;
-            r.setLeft = true;
-            r.right = 80;
-            r.left = 25;
-            r.duration = 6; // 60ms
-            performRumble(r);
-
             LedModeData led = {};
             led.mode = LED_BLINK_FAST;
             led.brightness = 0x20;
             setLedMode(led);
-            std::this_thread::sleep_for(std::chrono::milliseconds(120));
+
+            pulseMotors(25, 80, 60);
+
+            std::this_thread::sleep_for(std::chrono::milliseconds(60));
             led.mode = LED_ON;
             led.brightness = 0x14;
             setLedMode(led);
@@ -124,19 +130,14 @@ void Controller::feedbackWorker()
         case HapticPattern::NotchTier2:
         {
             // Heavy dual punch at 2.0s
-            RumbleData r = {};
-            r.setRight = true;
-            r.setLeft = true;
-            r.right = 85;
-            r.left = 85;
-            r.duration = 8; // 80ms
-            performRumble(r);
-
             LedModeData led = {};
             led.mode = LED_BLINK_FAST;
             led.brightness = 0x20;
             setLedMode(led);
-            std::this_thread::sleep_for(std::chrono::milliseconds(150));
+
+            pulseMotors(85, 85, 80);
+
+            std::this_thread::sleep_for(std::chrono::milliseconds(70));
             led.mode = LED_ON;
             led.brightness = 0x14;
             setLedMode(led);
@@ -145,17 +146,14 @@ void Controller::feedbackWorker()
         case HapticPattern::SuccessTap:
         {
             // Crisp shutter click
-            RumbleData r = {};
-            r.setRight = true;
-            r.right = 50;
-            r.duration = 4; // 40ms
-            performRumble(r);
-
             LedModeData led = {};
             led.mode = LED_BLINK_FAST;
             led.brightness = 0x20;
             setLedMode(led);
-            std::this_thread::sleep_for(std::chrono::milliseconds(100));
+
+            pulseMotors(0, 65, 45);
+
+            std::this_thread::sleep_for(std::chrono::milliseconds(60));
             led.mode = LED_ON;
             led.brightness = 0x14;
             setLedMode(led);
@@ -169,21 +167,10 @@ void Controller::feedbackWorker()
             led.brightness = 0x20;
             setLedMode(led);
 
-            RumbleData r1 = {};
-            r1.setLeft = true; r1.setRight = true;
-            r1.left = 70; r1.right = 60;
-            r1.duration = 6; // 60ms
-            performRumble(r1);
-
-            std::this_thread::sleep_for(std::chrono::milliseconds(110));
-
-            RumbleData r2 = {};
-            r2.setLeft = true; r2.setRight = true;
-            r2.left = 85; r2.right = 75;
-            r2.duration = 7; // 70ms
-            performRumble(r2);
-
-            std::this_thread::sleep_for(std::chrono::milliseconds(140));
+            pulseMotors(70, 60, 60);
+            std::this_thread::sleep_for(std::chrono::milliseconds(100));
+            pulseMotors(85, 75, 70);
+            std::this_thread::sleep_for(std::chrono::milliseconds(100));
 
             led.mode = LED_ON;
             led.brightness = 0x14;
@@ -200,16 +187,10 @@ void Controller::feedbackWorker()
 
             for (int i = 0; i < 3; ++i)
             {
-                RumbleData r = {};
-                r.setLeft = true; r.setRight = true;
-                r.left = static_cast<uint8_t>(75 + i * 10);
-                r.right = static_cast<uint8_t>(70 + i * 10);
-                r.duration = 6;
-                performRumble(r);
-                std::this_thread::sleep_for(std::chrono::milliseconds(95));
+                pulseMotors(static_cast<uint8_t>(75 + i * 10), static_cast<uint8_t>(70 + i * 10), 60);
+                std::this_thread::sleep_for(std::chrono::milliseconds(80));
             }
 
-            std::this_thread::sleep_for(std::chrono::milliseconds(110));
             led.mode = LED_ON;
             led.brightness = 0x14;
             setLedMode(led);
@@ -218,19 +199,9 @@ void Controller::feedbackWorker()
         case HapticPattern::FailureOrCancel:
         {
             // Descending soft fade / wah-wah
-            RumbleData r1 = {};
-            r1.setLeft = true; r1.setRight = true;
-            r1.left = 50; r1.right = 20;
-            r1.duration = 14;
-            performRumble(r1);
-
-            std::this_thread::sleep_for(std::chrono::milliseconds(130));
-
-            RumbleData r2 = {};
-            r2.setLeft = true; r2.setRight = true;
-            r2.left = 20; r2.right = 10;
-            r2.duration = 14;
-            performRumble(r2);
+            pulseMotors(50, 20, 100);
+            std::this_thread::sleep_for(std::chrono::milliseconds(50));
+            pulseMotors(20, 10, 80);
 
             LedModeData led = {};
             led.mode = LED_ON;
@@ -410,9 +381,10 @@ void Controller::inputReceived(const InputData *input, bool sharePressed)
                 {
                     // Plateau vibration indicating Tier 2 is locked and ready to release
                     RumbleData r = {};
-                    r.setLeft = true; r.setRight = true;
+                    r.motors = 0x0f;
                     r.left = 40; r.right = 40;
-                    r.duration = 6;
+                    r.duration = 0xff;
+                    r.repeat = 0xeb;
                     performRumble(r);
                     lastRampUpdateTime = now;
                 }
@@ -435,9 +407,10 @@ void Controller::inputReceived(const InputData *input, bool sharePressed)
                     uint8_t lPower = static_cast<uint8_t>(20 + progress * 55.0f);
 
                     RumbleData r = {};
-                    r.setLeft = true; r.setRight = true;
+                    r.motors = 0x0f;
                     r.left = lPower; r.right = rPower;
-                    r.duration = 6;
+                    r.duration = 0xff;
+                    r.repeat = 0xeb;
                     performRumble(r);
                     lastRampUpdateTime = now;
                 }
@@ -451,9 +424,11 @@ void Controller::inputReceived(const InputData *input, bool sharePressed)
                 uint8_t power = static_cast<uint8_t>(15 + progress * 30.0f);
 
                 RumbleData r = {};
-                r.setRight = true;
+                r.motors = 0x0f;
+                r.left = 0;
                 r.right = power;
-                r.duration = 6;
+                r.duration = 0xff;
+                r.repeat = 0xeb;
                 performRumble(r);
                 lastRampUpdateTime = now;
             }
@@ -466,8 +441,7 @@ void Controller::inputReceived(const InputData *input, bool sharePressed)
         auto elapsedMs = std::chrono::duration_cast<std::chrono::milliseconds>(now - sharePressStartTime).count();
 
         // Silence any ongoing ramp rumble immediately
-        RumbleData killRumble = {};
-        performRumble(killRumble);
+        stopRumble();
 
         if (cancelTriggered)
         {
@@ -508,6 +482,18 @@ void Controller::inputReceived(const InputData *input, bool sharePressed)
 void Controller::initInput(const AnnounceData *announce)
 {
     LedModeData ledMode = {};
+
+    // Test welcome vibration to confirm hardware rumble communication
+    Log::info("Controller connected - triggering test rumble pulse");
+    RumbleData welcome = {};
+    welcome.motors = 0x0f;
+    welcome.left = 45;
+    welcome.right = 55;
+    welcome.duration = 0xff;
+    welcome.repeat = 0xeb;
+    performRumble(welcome);
+    std::this_thread::sleep_for(std::chrono::milliseconds(120));
+    stopRumble();
 
     // Dim the LED a little bit, like the original driver (brightness 0x00 - 0x20)
     ledMode.mode = LED_ON;
@@ -566,18 +552,14 @@ void Controller::processRumble()
 void Controller::onRumbleReceived(uint8_t largeMotor, uint8_t smallMotor)
 {
     RumbleData rumble = {};
-
-    rumble.setRight = true;
-    rumble.setLeft = true;
+    rumble.motors = 0x0f;
 
     // Map 0-255 motor value to 0-100 rumble power
     rumble.left = static_cast<uint8_t>(largeMotor * RUMBLE_MAX_POWER / 255);
     rumble.right = static_cast<uint8_t>(smallMotor * RUMBLE_MAX_POWER / 255);
-
-    // Duration in multiples of 10ms (20 = 200ms)
-    rumble.duration = 20;
+    rumble.duration = 0xff;
     rumble.delay = 0;
-    rumble.repeat = 0;
+    rumble.repeat = 0xeb;
 
     rumbleBuffer.put(rumble);
     rumbleCondition.notify_all();

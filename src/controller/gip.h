@@ -87,19 +87,26 @@ protected:
 
     struct RumbleData
     {
-        uint8_t unknown;
-        uint8_t setRight : 1;
-        uint8_t setLeft : 1;
-        uint8_t setRightTrigger : 1;
-        uint8_t setLeftTrigger : 1;
-        uint8_t padding : 4;
-        uint8_t leftTrigger;
-        uint8_t rightTrigger;
-        uint8_t left;
-        uint8_t right;
-        uint8_t duration;
-        uint8_t delay;
-        uint8_t repeat;
+        uint8_t unknown = 0;
+        union
+        {
+            uint8_t motors = 0x0f;
+            struct
+            {
+                uint8_t setRight : 1;
+                uint8_t setLeft : 1;
+                uint8_t setRightTrigger : 1;
+                uint8_t setLeftTrigger : 1;
+                uint8_t padding : 4;
+            };
+        };
+        uint8_t leftTrigger = 0;
+        uint8_t rightTrigger = 0;
+        uint8_t left = 0;
+        uint8_t right = 0;
+        uint8_t duration = 0xff;
+        uint8_t delay = 0;
+        uint8_t repeat = 0xeb;
     } PACKED;
 
     struct LedModeData
@@ -168,6 +175,7 @@ protected:
 
     bool setPowerMode(uint8_t id, PowerMode mode);
     bool performRumble(RumbleData rumble);
+    bool stopRumble();
     bool setLedMode(LedModeData mode);
     bool requestSerialNumber();
 
