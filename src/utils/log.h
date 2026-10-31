@@ -3,6 +3,11 @@
 #include <string>
 #include <cstdio>
 
+#if defined(_WIN32)
+#define WIN32_LEAN_AND_MEAN
+#include <windows.h>
+#endif
+
 class Bytes;
 
 /*
@@ -27,6 +32,9 @@ namespace Log
     {
         #ifdef DEBUG
         std::string output = formatLog("DEBUG", message);
+#if defined(_WIN32)
+        OutputDebugStringA(output.c_str());
+#endif
         std::fputs(output.c_str(), stdout);
         #endif
     }
@@ -36,13 +44,21 @@ namespace Log
     {
         #ifdef DEBUG
         std::string output = formatLog("DEBUG", message);
-        std::fprintf(stdout, output.c_str(), args...);
+        char buf[1024];
+        snprintf(buf, sizeof(buf), output.c_str(), args...);
+#if defined(_WIN32)
+        OutputDebugStringA(buf);
+#endif
+        std::fputs(buf, stdout);
         #endif
     }
 
     inline void info(std::string message)
     {
         std::string output = formatLog("INFO", message);
+#if defined(_WIN32)
+        OutputDebugStringA(output.c_str());
+#endif
         std::fputs(output.c_str(), stdout);
     }
 
@@ -50,12 +66,20 @@ namespace Log
     inline void info(std::string message, Args... args)
     {
         std::string output = formatLog("INFO", message);
-        std::fprintf(stdout, output.c_str(), args...);
+        char buf[1024];
+        snprintf(buf, sizeof(buf), output.c_str(), args...);
+#if defined(_WIN32)
+        OutputDebugStringA(buf);
+#endif
+        std::fputs(buf, stdout);
     }
 
     inline void error(std::string message)
     {
         std::string output = formatLog("ERROR", message);
+#if defined(_WIN32)
+        OutputDebugStringA(output.c_str());
+#endif
         std::fputs(output.c_str(), stderr);
     }
 
@@ -63,6 +87,11 @@ namespace Log
     inline void error(std::string message, Args... args)
     {
         std::string output = formatLog("ERROR", message);
-        std::fprintf(stderr, output.c_str(), args...);
+        char buf[1024];
+        snprintf(buf, sizeof(buf), output.c_str(), args...);
+#if defined(_WIN32)
+        OutputDebugStringA(buf);
+#endif
+        std::fputs(buf, stderr);
     }
 }
