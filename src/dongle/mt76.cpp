@@ -1066,7 +1066,7 @@ bool Mt76::sendClientPacket(
     WlanFrame wlanFrame = {};
 
     // Frame is sent from AP (DS)
-    // Duration is the time required to transmit (ÃƒÅ½Ã‚Â¼s)
+    // Duration is the time required to transmit (ÃƒÆ’Ã…Â½Ãƒâ€šÃ‚Â¼s)
     wlanFrame.frameControl.type = MT_WLAN_DATA;
     wlanFrame.frameControl.subtype = MT_WLAN_QOS_DATA;
     wlanFrame.frameControl.fromDs = true;
