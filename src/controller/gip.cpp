@@ -114,10 +114,55 @@ bool GipDevice::handlePacket(const Bytes &packet)
         frame->length >= sizeof(InputData) &&
         data.size() >= sizeof(InputData)
     ) {
+        static size_t loggedLen = 0;
+        if (loggedLen != data.size())
+        {
+            loggedLen = data.size();
+            Log::info("CMD_INPUT: payload length = %zu bytes", data.size());
+        }
+
+        // Share button on Xbox Series X|S (Model 1914):
+        // Dynamic packet layout in GIP:
+        // When DLI is present (44 bytes total), share button is at byte 18 (44 - 26 = 18).
+        // If DLI is absent, share button is at len - 18 (e.g. byte 26 on 44-byte packets, or len - 18).
         bool sharePressed = false;
-        if (data.size() > 18)
+        if (data.size() >= 26)
+        {
+            sharePressed = ((data[18] & 0x01) != 0) || ((data[data.size() - 18] & 0x01) != 0);
+        }
+        else if (data.size() > 18)
         {
             sharePressed = (data[18] & 0x01) != 0;
+        }
+
+        static bool lastShare = false;
+        if (sharePressed != lastShare)
+        {
+            lastShare = sharePressed;
+            Log::info(">>> Share Button STATE CHANGED: %s <<<", sharePressed ? "PRESSED (DOWN)" : "RELEASED (UP)");
+        }
+
+        // Diagnostic: detect if any trailing extra byte changes when pressing buttons
+        static uint8_t lastExtra[32] = {};
+        bool extraChanged = false;
+        for (size_t i = 14; i < data.size() && i < 46; ++i)
+        {
+            if (data[i] != lastExtra[i - 14])
+            {
+                extraChanged = true;
+                lastExtra[i - 14] = data[i];
+            }
+        }
+        if (extraChanged)
+        {
+            std::string extraLog = "";
+            for (size_t i = 14; i < data.size(); ++i)
+            {
+                char buf[32];
+                snprintf(buf, sizeof(buf), "[%zu]=0x%02x ", i, data[i]);
+                extraLog += buf;
+            }
+            Log::info("Input extra bytes: %s", extraLog.c_str());
         }
 
         inputReceived(data.toStruct<InputData>(), sharePressed);
@@ -147,6 +192,7 @@ bool GipDevice::setPowerMode(uint8_t id, PowerMode mode)
 
 bool GipDevice::performRumble(RumbleData rumble)
 {
+    static_assert(sizeof(RumbleData) == 9, "RumbleData size must be 9");
     Frame frame = {};
 
     frame.command = CMD_RUMBLE;
@@ -159,7 +205,22 @@ bool GipDevice::performRumble(RumbleData rumble)
     out.append(frame);
     out.append(rumble);
 
+    Log::info("performRumble: motors=0x%02x, L=%u, R=%u, duration=%u, repeat=%u",
+              rumble.motors, rumble.left, rumble.right, rumble.duration, rumble.repeat);
+
     return sendPacket(out);
+}
+
+bool GipDevice::stopRumble()
+{
+    RumbleData stop = {};
+    stop.motors = 0x0f;
+    stop.left = 0;
+    stop.right = 0;
+    stop.duration = 0xff;
+    stop.delay = 0;
+    stop.repeat = 0xeb;
+    return performRumble(stop);
 }
 
 bool GipDevice::setLedMode(LedModeData mode)

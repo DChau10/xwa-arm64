@@ -25,6 +25,7 @@
 #include <functional>
 #include <string>
 #include <array>
+#include <mutex>
 
 // Endpoint numbers for reading and writing
 // WLAN packets use a separate endpoint
@@ -589,6 +590,7 @@ private:
     );
     Bytes efuseRead(uint8_t address, uint8_t index);
 
+    std::mutex txMutex;
     uint16_t connectedClients = 0;
     std::array<Bytes, MT_WCID_COUNT> clientAddresses;
 };
