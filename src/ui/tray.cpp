@@ -61,7 +61,6 @@ static bool setAutoStartEnabled(bool enable)
         std::wstring cmd = L"\"" + std::wstring(exePath) + L"\" --hide";
         LONG res = RegSetValueExW(hKey, L"xwa-arm64", 0, REG_SZ,
             (const BYTE*)cmd.c_str(), static_cast<DWORD>((cmd.length() + 1) * sizeof(wchar_t)));
-        RegDeleteValueW(hKey, L"xow-win"); // Clean up legacy key
         RegCloseKey(hKey);
         return (res == ERROR_SUCCESS);
     }
