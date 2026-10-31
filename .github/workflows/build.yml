@@ -32,7 +32,6 @@ jobs:
           New-Item -ItemType Directory -Path $pkgDir -Force
           Copy-Item -Path "bin\xwa-arm64.exe" -Destination $pkgDir -Force
           Copy-Item -Path "driver" -Destination $pkgDir -Recurse -Force
-          Copy-Item -Path "firmware" -Destination $pkgDir -Recurse -Force
           Copy-Item -Path "scripts" -Destination $pkgDir -Recurse -Force
           Copy-Item -Path "README.md", "LICENSE" -Destination $pkgDir -Force
           Compress-Archive -Path "$pkgDir\*" -DestinationPath "xwa-arm64-${{ matrix.arch }}.zip" -Force

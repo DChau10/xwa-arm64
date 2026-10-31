@@ -32,7 +32,6 @@ Write-Host "Detected Architecture: $env:PROCESSOR_ARCHITECTURE" -ForegroundColor
 
 $RepoRoot = Resolve-Path "$PSScriptRoot\.."
 $DriverInf = Join-Path $RepoRoot "driver\xwa_dongle.inf"
-$FirmwareSrc = Join-Path $RepoRoot "firmware\FW_ACC_00U.bin"
 $ProgramDataDir = Join-Path $env:ProgramData "xwa-arm64"
 
 # 2. Check and Install ViGEmBus
@@ -106,9 +105,6 @@ if (-not (Test-Path $ProgramDataDir)) {
 $targetFw = Join-Path $ProgramDataDir "FW_ACC_00U.bin"
 if (Test-Path $targetFw) {
     Write-Host "[+] Firmware is already present in $targetFw" -ForegroundColor Green
-} elseif (Test-Path $FirmwareSrc) {
-    Copy-Item $FirmwareSrc -Destination $targetFw -Force
-    Write-Host "[+] Firmware copied to $targetFw" -ForegroundColor Green
 } else {
     Write-Host "[*] Fetching official firmware from Microsoft Update CDN..." -ForegroundColor Cyan
     $getFwScript = Join-Path $PSScriptRoot "get-firmware.ps1"
