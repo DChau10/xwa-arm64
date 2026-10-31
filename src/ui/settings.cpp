@@ -119,7 +119,6 @@ Settings Settings::load(const std::string &configPath)
         else if (key == "hapticMode") s.hapticMode = static_cast<HapticMode>(std::stoi(val));
         else if (key == "holdDurationMs") s.holdDurationMs = std::stoi(val);
         else if (key == "hold2DurationMs") s.hold2DurationMs = std::stoi(val);
-        else if (key == "cancelDurationMs") s.cancelDurationMs = std::stoi(val);
     }
 
     Log::info("Loaded settings from %s (Share: %s, HapticMode: %d)", path.c_str(),
@@ -145,8 +144,7 @@ bool Settings::save(const std::string &configPath) const
          << "  \"hold2Action\": " << static_cast<int>(hold2Action) << ",\n"
          << "  \"hapticMode\": " << static_cast<int>(hapticMode) << ",\n"
          << "  \"holdDurationMs\": " << holdDurationMs << ",\n"
-         << "  \"hold2DurationMs\": " << hold2DurationMs << ",\n"
-         << "  \"cancelDurationMs\": " << cancelDurationMs << "\n"
+         << "  \"hold2DurationMs\": " << hold2DurationMs << "\n"
          << "}\n";
 
     Log::info("Saved settings to %s", path.c_str());
