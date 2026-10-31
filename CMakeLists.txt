@@ -89,6 +89,7 @@ set(SOURCES
     src/ui/action_dispatcher.cpp
     src/ui/tray.h
     src/ui/tray.cpp
+    res/xow-win.rc
 )
 
 add_executable(xow-win ${SOURCES})

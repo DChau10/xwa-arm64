@@ -1,6 +1,7 @@
 #include "tray.h"
 #include "settings.h"
 #include "../utils/log.h"
+#include "../../res/resource.h"
 
 #define WIN32_LEAN_AND_MEAN
 #include <windows.h>
@@ -16,6 +17,7 @@
 #define IDM_STATUS 1002
 #define IDM_SETTINGS 1003
 #define IDM_PAIR 1004
+#define IDM_AUTOSTART 1006
 #define IDM_EXIT 1005
 
 #define IDC_CHK_ENABLE 2001
@@ -24,8 +26,51 @@
 #define IDC_CMB_HOLD 2004
 #define IDC_CMB_HOLD2 2005
 #define IDC_CMB_HAPTIC 2006
+#define IDC_CHK_AUTOSTART 2009
 #define IDC_BTN_SAVE 2007
 #define IDC_BTN_CANCEL 2008
+
+static bool isAutoStartEnabled()
+{
+    HKEY hKey;
+    if (RegOpenKeyExW(HKEY_CURRENT_USER, L"Software\\Microsoft\\Windows\\CurrentVersion\\Run", 0, KEY_READ, &hKey) != ERROR_SUCCESS)
+    {
+        return false;
+    }
+    wchar_t val[MAX_PATH * 2] = { 0 };
+    DWORD size = sizeof(val);
+    DWORD type = 0;
+    LONG res = RegQueryValueExW(hKey, L"xow-win", NULL, &type, (LPBYTE)val, &size);
+    RegCloseKey(hKey);
+    return (res == ERROR_SUCCESS);
+}
+
+static bool setAutoStartEnabled(bool enable)
+{
+    HKEY hKey;
+    if (RegOpenKeyExW(HKEY_CURRENT_USER, L"Software\\Microsoft\\Windows\\CurrentVersion\\Run", 0, KEY_SET_VALUE, &hKey) != ERROR_SUCCESS)
+    {
+        return false;
+    }
+
+    if (enable)
+    {
+        wchar_t exePath[MAX_PATH] = { 0 };
+        GetModuleFileNameW(NULL, exePath, MAX_PATH);
+
+        std::wstring cmd = L"\"" + std::wstring(exePath) + L"\" --hide";
+        LONG res = RegSetValueExW(hKey, L"xow-win", 0, REG_SZ,
+            (const BYTE*)cmd.c_str(), static_cast<DWORD>((cmd.length() + 1) * sizeof(wchar_t)));
+        RegCloseKey(hKey);
+        return (res == ERROR_SUCCESS);
+    }
+    else
+    {
+        LONG res = RegDeleteValueW(hKey, L"xow-win");
+        RegCloseKey(hKey);
+        return (res == ERROR_SUCCESS || res == ERROR_FILE_NOT_FOUND);
+    }
+}
 
 static HWND g_hTrayWnd = NULL;
 static HWND g_hSettingsWnd = NULL;
@@ -47,9 +92,15 @@ static LRESULT CALLBACK SettingsWndProc(HWND hwnd, UINT msg, WPARAM wParam, LPAR
     {
         g_hFont = (HFONT)GetStockObject(DEFAULT_GUI_FONT);
 
+        HINSTANCE hInst = GetModuleHandleW(NULL);
+        HICON hBig = (HICON)LoadImageW(hInst, MAKEINTRESOURCEW(IDI_APP_ICON), IMAGE_ICON, 32, 32, LR_DEFAULTCOLOR);
+        HICON hSmall = (HICON)LoadImageW(hInst, MAKEINTRESOURCEW(IDI_APP_ICON), IMAGE_ICON, 16, 16, LR_DEFAULTCOLOR);
+        if (hBig) SendMessageW(hwnd, WM_SETICON, ICON_BIG, (LPARAM)hBig);
+        if (hSmall) SendMessageW(hwnd, WM_SETICON, ICON_SMALL, (LPARAM)hSmall);
+
         // Group Box: Share Button
         HWND hGroup = CreateWindowExW(0, L"BUTTON", L" Xbox Wireless Controller (Share Button Settings) ",
-            WS_CHILD | WS_VISIBLE | BS_GROUPBOX, 15, 10, 470, 350, hwnd, NULL, NULL, NULL);
+            WS_CHILD | WS_VISIBLE | BS_GROUPBOX, 15, 10, 470, 375, hwnd, NULL, NULL, NULL);
         SendMessageW(hGroup, WM_SETFONT, (WPARAM)g_hFont, TRUE);
 
         // Enable Checkbox
@@ -127,13 +178,19 @@ static LRESULT CALLBACK SettingsWndProc(HWND hwnd, UINT msg, WPARAM wParam, LPAR
             WS_CHILD | WS_VISIBLE, 30, 300, 435, 34, hwnd, NULL, NULL, NULL);
         SendMessageW(hLblHint, WM_SETFONT, (WPARAM)g_hFont, TRUE);
 
+        // Auto-Start Checkbox
+        HWND hChkAutoStart = CreateWindowExW(0, L"BUTTON", L"Start xow-win automatically with Windows (run in system tray)",
+            WS_CHILD | WS_VISIBLE | BS_AUTOCHECKBOX, 30, 345, 435, 20, hwnd, (HMENU)IDC_CHK_AUTOSTART, NULL, NULL);
+        SendMessageW(hChkAutoStart, WM_SETFONT, (WPARAM)g_hFont, TRUE);
+        SendMessageW(hChkAutoStart, BM_SETCHECK, isAutoStartEnabled() ? BST_CHECKED : BST_UNCHECKED, 0);
+
         // Bottom buttons
         HWND hBtnSave = CreateWindowExW(0, L"BUTTON", L"Save & Apply",
-            WS_CHILD | WS_VISIBLE | BS_DEFPUSHBUTTON, 260, 370, 110, 28, hwnd, (HMENU)IDC_BTN_SAVE, NULL, NULL);
+            WS_CHILD | WS_VISIBLE | BS_DEFPUSHBUTTON, 260, 395, 110, 28, hwnd, (HMENU)IDC_BTN_SAVE, NULL, NULL);
         SendMessageW(hBtnSave, WM_SETFONT, (WPARAM)g_hFont, TRUE);
 
         HWND hBtnCancel = CreateWindowExW(0, L"BUTTON", L"Cancel",
-            WS_CHILD | WS_VISIBLE | BS_PUSHBUTTON, 380, 370, 105, 28, hwnd, (HMENU)IDC_BTN_CANCEL, NULL, NULL);
+            WS_CHILD | WS_VISIBLE | BS_PUSHBUTTON, 380, 395, 105, 28, hwnd, (HMENU)IDC_BTN_CANCEL, NULL, NULL);
         SendMessageW(hBtnCancel, WM_SETFONT, (WPARAM)g_hFont, TRUE);
 
         // Populate controls from current settings
@@ -163,6 +220,9 @@ static LRESULT CALLBACK SettingsWndProc(HWND hwnd, UINT msg, WPARAM wParam, LPAR
 
             s.save();
             setGlobalSettings(s);
+
+            bool autoStartCheck = (SendMessageW(GetDlgItem(hwnd, IDC_CHK_AUTOSTART), BM_GETCHECK, 0, 0) == BST_CHECKED);
+            setAutoStartEnabled(autoStartCheck);
 
             DestroyWindow(hwnd);
             return 0;
@@ -226,6 +286,10 @@ static LRESULT CALLBACK TrayWndProc(HWND hwnd, UINT msg, WPARAM wParam, LPARAM l
             AppendMenuW(hMenu, MF_SEPARATOR, 0, NULL);
             AppendMenuW(hMenu, MF_STRING, IDM_SETTINGS, L"Settings...");
             AppendMenuW(hMenu, MF_STRING, IDM_PAIR, L"Pair New Controller");
+
+            UINT autoStartFlags = MF_STRING | (isAutoStartEnabled() ? MF_CHECKED : MF_UNCHECKED);
+            AppendMenuW(hMenu, autoStartFlags, IDM_AUTOSTART, L"Start with Windows");
+
             AppendMenuW(hMenu, MF_SEPARATOR, 0, NULL);
             AppendMenuW(hMenu, MF_STRING, IDM_EXIT, L"Exit");
 
@@ -246,6 +310,12 @@ static LRESULT CALLBACK TrayWndProc(HWND hwnd, UINT msg, WPARAM wParam, LPARAM l
         else if (id == IDM_PAIR)
         {
             if (g_onPair) g_onPair();
+        }
+        else if (id == IDM_AUTOSTART)
+        {
+            bool currentlyEnabled = isAutoStartEnabled();
+            setAutoStartEnabled(!currentlyEnabled);
+            Log::info("Start with Windows toggled: %s", !currentlyEnabled ? "ENABLED" : "DISABLED");
         }
         else if (id == IDM_EXIT)
         {
@@ -300,7 +370,24 @@ bool SystemTray::init(HINSTANCE hInstance, PairCallback onPair, ExitCallback onE
     g_nid.uID = 1;
     g_nid.uFlags = NIF_MESSAGE | NIF_ICON | NIF_TIP;
     g_nid.uCallbackMessage = WM_TRAYICON;
-    g_nid.hIcon = LoadIconW(NULL, (LPCWSTR)IDI_APPLICATION);
+    HINSTANCE hInst = hInstance ? hInstance : GetModuleHandleW(NULL);
+    HICON hCustomIcon = (HICON)LoadImageW(
+        hInst,
+        MAKEINTRESOURCEW(IDI_APP_ICON),
+        IMAGE_ICON,
+        GetSystemMetrics(SM_CXSMICON),
+        GetSystemMetrics(SM_CYSMICON),
+        LR_DEFAULTCOLOR
+    );
+    if (!hCustomIcon)
+    {
+        hCustomIcon = LoadIconW(hInst, MAKEINTRESOURCEW(IDI_APP_ICON));
+    }
+    if (!hCustomIcon)
+    {
+        hCustomIcon = LoadIconW(NULL, (LPCWSTR)IDI_APPLICATION);
+    }
+    g_nid.hIcon = hCustomIcon;
     wcscpy_s(g_nid.szTip, L"xow-win: Xbox Wireless Adapter");
 
     Shell_NotifyIconW(NIM_ADD, &g_nid);
@@ -337,7 +424,7 @@ void SystemTray::showSettingsDialog()
     }
 
     int width = 515;
-    int height = 450;
+    int height = 475;
     int screenW = GetSystemMetrics(SM_CXSCREEN);
     int screenH = GetSystemMetrics(SM_CYSCREEN);
     int x = (screenW - width) / 2;
