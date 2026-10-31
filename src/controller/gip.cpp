@@ -42,6 +42,8 @@ struct Frame
 } PACKED;
 PACKED_STRUCT_END
 
+static_assert(sizeof(Frame) == 4, "Frame size must be 4");
+
 GipDevice::GipDevice(SendPacket sendPacket) : sendPacket(sendPacket) {}
 
 bool GipDevice::handlePacket(const Bytes &packet)

@@ -266,17 +266,17 @@ protected:
 
     struct FrameControl
     {
-        uint32_t protocolVersion : 2;
-        uint32_t type : 2;
-        uint32_t subtype : 4;
-        uint32_t toDs : 1;
-        uint32_t fromDs : 1;
-        uint32_t moreFragments : 1;
-        uint32_t retry : 1;
-        uint32_t powerManagement : 1;
-        uint32_t moreData : 1;
-        uint32_t protectedFrame : 1;
-        uint32_t order : 1;
+        uint16_t protocolVersion : 2;
+        uint16_t type : 2;
+        uint16_t subtype : 4;
+        uint16_t toDs : 1;
+        uint16_t fromDs : 1;
+        uint16_t moreFragments : 1;
+        uint16_t retry : 1;
+        uint16_t powerManagement : 1;
+        uint16_t moreData : 1;
+        uint16_t protectedFrame : 1;
+        uint16_t order : 1;
     } PACKED;
 
     struct WlanFrame
@@ -507,6 +507,20 @@ protected:
         uint32_t value;
     };
     PACKED_STRUCT_END
+
+    static_assert(sizeof(QosFrame) == 2, "QosFrame size must be 2");
+    static_assert(sizeof(AssociationResponseFrame) == 14, "AssociationResponseFrame size must be 14");
+    static_assert(sizeof(ReservedFrame) == 2, "ReservedFrame size must be 2");
+    static_assert(sizeof(BeaconFrame) == 14, "BeaconFrame size must be 14");
+    static_assert(sizeof(FrameControl) == 2, "FrameControl size must be 2");
+    static_assert(sizeof(WlanFrame) == 24, "WlanFrame size must be 24");
+    static_assert(sizeof(RxWi) == 32, "RxWi size must be 32");
+    static_assert(sizeof(TxWi) == 20, "TxWi size must be 20");
+    static_assert(sizeof(RxInfoGeneric) == 4, "RxInfoGeneric size must be 4");
+    static_assert(sizeof(RxInfoCommand) == 4, "RxInfoCommand size must be 4");
+    static_assert(sizeof(RxInfoPacket) == 4, "RxInfoPacket size must be 4");
+    static_assert(sizeof(TxInfoCommand) == 4, "TxInfoCommand size must be 4");
+    static_assert(sizeof(TxInfoPacket) == 4, "TxInfoPacket size must be 4");
 
     Mt76(std::unique_ptr<UsbDevice> usbDevice);
     virtual ~Mt76();
