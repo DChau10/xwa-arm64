@@ -109,21 +109,30 @@ void Controller::serialNumberReceived(const SerialData *serial)
 
 void Controller::inputReceived(const InputData *input)
 {
-    currentState.start = input->buttons.start;
-    currentState.back = input->buttons.select;
-    currentState.a = input->buttons.a;
-    currentState.b = input->buttons.b;
-    currentState.x = input->buttons.x;
-    currentState.y = input->buttons.y;
-    currentState.bumperLeft = input->buttons.bumperLeft;
-    currentState.bumperRight = input->buttons.bumperRight;
-    currentState.stickLeft = input->buttons.stickLeft;
-    currentState.stickRight = input->buttons.stickRight;
+    static bool firstPacketLogged = false;
+    if (!firstPacketLogged)
+    {
+        Log::info("Controller input stream active (first input packet received)");
+        firstPacketLogged = true;
+    }
 
-    currentState.dpadUp = input->buttons.dpadUp;
-    currentState.dpadDown = input->buttons.dpadDown;
-    currentState.dpadLeft = input->buttons.dpadLeft;
-    currentState.dpadRight = input->buttons.dpadRight;
+    uint16_t b = input->buttons.raw;
+    currentState.start = (b & (1 << 2)) != 0;
+    currentState.back = (b & (1 << 3)) != 0;
+    currentState.a = (b & (1 << 4)) != 0;
+    currentState.b = (b & (1 << 5)) != 0;
+    currentState.x = (b & (1 << 6)) != 0;
+    currentState.y = (b & (1 << 7)) != 0;
+
+    currentState.dpadUp = (b & (1 << 8)) != 0;
+    currentState.dpadDown = (b & (1 << 9)) != 0;
+    currentState.dpadLeft = (b & (1 << 10)) != 0;
+    currentState.dpadRight = (b & (1 << 11)) != 0;
+
+    currentState.bumperLeft = (b & (1 << 12)) != 0;
+    currentState.bumperRight = (b & (1 << 13)) != 0;
+    currentState.stickLeft = (b & (1 << 14)) != 0;
+    currentState.stickRight = (b & (1 << 15)) != 0;
 
     // Analog sticks
     currentState.thumbLX = input->stickLeftX;
