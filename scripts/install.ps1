@@ -5,7 +5,7 @@
     1. Ensures administrator rights.
     2. Installs ViGEmBus driver if not already present.
     3. Binds Microsoft WinUSB to the Xbox Wireless Adapter using pnputil.
-    4. Copies firmware to %ProgramData%\xow-win.
+    4. Downloads/extracts official firmware from Microsoft Update into %ProgramData%\xow-win.
     5. Sets up automatic launch on startup.
 #>
 
@@ -68,17 +68,22 @@ if (Test-Path $DriverInf) {
     Write-Error "Could not find driver INF at $DriverInf"
 }
 
-# 4. Copy Firmware
+# 4. Acquire Firmware (Automated download from Microsoft if not present)
 Write-Host "[*] Setting up firmware..." -ForegroundColor Cyan
 if (-not (Test-Path $ProgramDataDir)) {
     New-Item -ItemType Directory -Path $ProgramDataDir -Force | Out-Null
 }
 
-if (Test-Path $FirmwareSrc) {
-    Copy-Item $FirmwareSrc -Destination (Join-Path $ProgramDataDir "FW_ACC_00U.bin") -Force
-    Write-Host "[+] Firmware copied to $ProgramDataDir\FW_ACC_00U.bin" -ForegroundColor Green
+$targetFw = Join-Path $ProgramDataDir "FW_ACC_00U.bin"
+if (Test-Path $targetFw) {
+    Write-Host "[+] Firmware is already present in $targetFw" -ForegroundColor Green
+} elseif (Test-Path $FirmwareSrc) {
+    Copy-Item $FirmwareSrc -Destination $targetFw -Force
+    Write-Host "[+] Firmware copied from local folder to $targetFw" -ForegroundColor Green
 } else {
-    Write-Warning "Firmware binary FW_ACC_00U.bin was not found in $FirmwareSrc. Please place it in $ProgramDataDir"
+    Write-Host "[*] Local firmware not found. Fetching official firmware from Microsoft Update CDN..." -ForegroundColor Cyan
+    $getFwScript = Join-Path $PSScriptRoot "get-firmware.ps1"
+    & $getFwScript -DestinationDir $ProgramDataDir
 }
 
 # 5. Startup Configuration
