@@ -24,6 +24,7 @@
 #include <cstdint>
 #include <functional>
 #include <string>
+#include <array>
 
 // Endpoint numbers for reading and writing
 // WLAN packets use a separate endpoint
@@ -589,6 +590,7 @@ private:
     Bytes efuseRead(uint8_t address, uint8_t index);
 
     uint16_t connectedClients = 0;
+    std::array<Bytes, MT_WCID_COUNT> clientAddresses;
 };
 
 class Mt76Exception : public std::runtime_error

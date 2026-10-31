@@ -64,6 +64,12 @@ void Dongle::handleControllerConnect(Bytes address)
         return;
     }
 
+    if (controllers[wcid - 1])
+    {
+        Log::debug("Controller '%d' already active, skipping duplicate instantiation", wcid);
+        return;
+    }
+
     GipDevice::SendPacket sendPacket = std::bind(
         &Dongle::sendClientPacket,
         this,
