@@ -170,8 +170,10 @@ int main(int argc, char *argv[])
     {
         Log::info("Xbox Wireless Adapter detected, but required WinUSB driver is missing (Code 28).");
         SystemTray::getInstance().updateDriverState(DriverUiState::DriverMissing);
-        // Prompt the user to install the driver
-        promptAndInstallWinUsb(SystemTray::getInstance().getTrayWindow());
+        // Prompt the user to install the driver asynchronously so tray message loop starts immediately
+        std::thread([hwnd = SystemTray::getInstance().getTrayWindow()]() {
+            promptAndInstallWinUsb(hwnd);
+        }).detach();
     }
 
     // Launch dongle acquisition & controller handling in a dedicated worker thread
