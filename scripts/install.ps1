@@ -44,35 +44,19 @@ if (-not $SkipViGEm) {
     if ($isInstalled) {
         Write-Host "[+] ViGEmBus driver is already installed." -ForegroundColor Green
     } else {
-        Write-Host "[*] ViGEmBus not found. Preparing signed ViGEmBus installer (ARM64/x64)..." -ForegroundColor Cyan
+        Write-Host "[*] ViGEmBus not found. Acquiring signed installer via get-vigem.ps1..." -ForegroundColor Cyan
         
-        $localInstaller = Join-Path $RepoRoot "ViGEmBus_Setup.exe"
-        $installerPath = Join-Path $env:TEMP "ViGEmBus_1.22.0_x64_x86_arm64.exe"
-        $viGemUrl = "https://github.com/nefarius/ViGEmBus/releases/download/v1.22.0/ViGEmBus_1.22.0_x64_x86_arm64.exe"
-
-        $installerToRun = $null
-        if (Test-Path $localInstaller) {
-            Write-Host "[+] Found local ViGEmBus installer in repository: $localInstaller" -ForegroundColor Green
-            $installerToRun = $localInstaller
-        } elseif (Test-Path $installerPath) {
-            Write-Host "[+] Found cached ViGEmBus installer at $installerPath" -ForegroundColor Green
-            $installerToRun = $installerPath
+        $getViGemScript = Join-Path $PSScriptRoot "get-vigem.ps1"
+        $installerPath = $null
+        if (Test-Path $getViGemScript) {
+            $installerPath = & $getViGemScript -DestinationDir $RepoRoot
         } else {
-            Write-Host "[*] Downloading official signed ViGEmBus installer from GitHub..." -ForegroundColor Cyan
-            try {
-                [Net.ServicePointManager]::SecurityProtocol = [Net.SecurityProtocolType]::Tls12
-                Invoke-WebRequest -Uri $viGemUrl -OutFile $installerPath -UseBasicParsing
-                $installerToRun = $installerPath
-                Write-Host "[+] Downloaded ViGEmBus installer." -ForegroundColor Green
-            } catch {
-                Write-Warning "Failed to download ViGEmBus automatically: $_"
-                Write-Host "Please download and install ViGEmBus manually from: https://github.com/nefarius/ViGEmBus/releases" -ForegroundColor Yellow
-            }
+            Write-Warning "Could not find get-vigem.ps1 at $getViGemScript"
         }
 
-        if ($installerToRun) {
+        if ($installerPath -and (Test-Path $installerPath)) {
             Write-Host "[*] Running ViGEmBus driver setup..." -ForegroundColor Cyan
-            $proc = Start-Process -FilePath $installerToRun -ArgumentList "/passive /norestart" -Wait -PassThru
+            $proc = Start-Process -FilePath $installerPath -ArgumentList "/passive /norestart" -Wait -PassThru
             
             Start-Sleep -Seconds 3
             $verifyInstalled = (Test-Path "$env:SystemRoot\System32\drivers\ViGEmBus.sys") -or 
@@ -84,6 +68,9 @@ if (-not $SkipViGEm) {
             } else {
                 Write-Warning "ViGEmBus installer finished with exit code $($proc.ExitCode). If prompt appeared, ensure installation was confirmed."
             }
+        } else {
+            Write-Warning "Failed to acquire ViGEmBus installer."
+            Write-Host "Please download and install ViGEmBus manually from: https://github.com/nefarius/ViGEmBus/releases" -ForegroundColor Yellow
         }
     }
 }
