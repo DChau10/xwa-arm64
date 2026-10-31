@@ -72,9 +72,9 @@ protected:
 
     struct StatusData
     {
-        uint32_t batteryLevel : 2;
-        uint32_t batteryType : 2;
-        uint32_t connectionInfo : 4;
+        uint8_t batteryLevel : 2;
+        uint8_t batteryType : 2;
+        uint8_t connectionInfo : 4;
         uint8_t unknown1;
         uint16_t unknown2;
     } PACKED;
@@ -119,21 +119,21 @@ protected:
     {
         struct
         {
-            uint32_t unknown : 2;
-            uint32_t start : 1;
-            uint32_t select : 1;
-            uint32_t a : 1;
-            uint32_t b : 1;
-            uint32_t x : 1;
-            uint32_t y : 1;
-            uint32_t dpadUp : 1;
-            uint32_t dpadDown : 1;
-            uint32_t dpadLeft : 1;
-            uint32_t dpadRight : 1;
-            uint32_t bumperLeft : 1;
-            uint32_t bumperRight : 1;
-            uint32_t stickLeft : 1;
-            uint32_t stickRight : 1;
+            uint16_t unknown : 2;
+            uint16_t start : 1;
+            uint16_t select : 1;
+            uint16_t a : 1;
+            uint16_t b : 1;
+            uint16_t x : 1;
+            uint16_t y : 1;
+            uint16_t dpadUp : 1;
+            uint16_t dpadDown : 1;
+            uint16_t dpadLeft : 1;
+            uint16_t dpadRight : 1;
+            uint16_t bumperLeft : 1;
+            uint16_t bumperRight : 1;
+            uint16_t stickLeft : 1;
+            uint16_t stickRight : 1;
         } PACKED buttons;
 
         uint16_t triggerLeft;
@@ -144,6 +144,14 @@ protected:
         int16_t stickRightY;
     } PACKED;
     PACKED_STRUCT_END
+
+    static_assert(sizeof(AnnounceData) == 28, "AnnounceData size must be 28");
+    static_assert(sizeof(StatusData) == 4, "StatusData size must be 4");
+    static_assert(sizeof(GuideButtonData) == 2, "GuideButtonData size must be 2");
+    static_assert(sizeof(RumbleData) == 9, "RumbleData size must be 9");
+    static_assert(sizeof(LedModeData) == 3, "LedModeData size must be 3");
+    static_assert(sizeof(SerialData) == 16, "SerialData size must be 16");
+    static_assert(sizeof(InputData) == 14, "InputData size must be 14");
 
     GipDevice(SendPacket sendPacket);
     virtual ~GipDevice() = default;

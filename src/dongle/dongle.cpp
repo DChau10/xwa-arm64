@@ -135,7 +135,7 @@ void Dongle::handleControllerPair(Bytes address, const Bytes &packet)
         return;
     }
 
-    Log::debug(
+    Log::info(
         "Controller paired: %s",
         Log::formatBytes(address).c_str()
     );
