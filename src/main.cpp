@@ -152,12 +152,11 @@ int main(int argc, char *argv[])
 
             SystemTray::getInstance().updateStatus(true, false, "none");
 
-            if (requestPair)
-            {
-                Log::info("Enabling pairing mode...");
-                dongle.setPairingStatus(true);
-                requestPair = false; // only on first launch
-            }
+            // Automatically enable pairing / reconnection window on startup (PR #176)
+            // Allows turned-on controllers to automatically connect without needing a manual button press
+            Log::info("Enabling automatic controller connection window...");
+            dongle.setPairingStatus(true);
+            requestPair = false;
 
             Log::info("Dongle is active and listening for controllers.");
 

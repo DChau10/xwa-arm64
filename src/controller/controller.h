@@ -74,10 +74,10 @@ private:
     bool initialized = false;
 
     /* Share button multi-tier state tracking */
-    bool shareWasPressed = false;
-    bool tier1NotchTriggered = false;
-    bool tier2NotchTriggered = false;
-    bool cancelTriggered = false;
+    std::atomic<bool> shareWasPressed{false};
+    std::atomic<bool> isShareHeld{false};
+    std::atomic<bool> tier1NotchTriggered{false};
+    std::atomic<bool> tier2NotchTriggered{false};
+    std::atomic<bool> cancelTriggered{false};
     std::chrono::steady_clock::time_point sharePressStartTime;
-    std::chrono::steady_clock::time_point lastRampUpdateTime;
 };
