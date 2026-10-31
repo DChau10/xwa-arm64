@@ -40,7 +40,7 @@ static bool isAutoStartEnabled()
     wchar_t val[MAX_PATH * 2] = { 0 };
     DWORD size = sizeof(val);
     DWORD type = 0;
-    LONG res = RegQueryValueExW(hKey, L"xow-win", NULL, &type, (LPBYTE)val, &size);
+    LONG res = RegQueryValueExW(hKey, L"xwa-arm64", NULL, &type, (LPBYTE)val, &size);
     RegCloseKey(hKey);
     return (res == ERROR_SUCCESS);
 }
@@ -59,14 +59,15 @@ static bool setAutoStartEnabled(bool enable)
         GetModuleFileNameW(NULL, exePath, MAX_PATH);
 
         std::wstring cmd = L"\"" + std::wstring(exePath) + L"\" --hide";
-        LONG res = RegSetValueExW(hKey, L"xow-win", 0, REG_SZ,
+        LONG res = RegSetValueExW(hKey, L"xwa-arm64", 0, REG_SZ,
             (const BYTE*)cmd.c_str(), static_cast<DWORD>((cmd.length() + 1) * sizeof(wchar_t)));
+        RegDeleteValueW(hKey, L"xow-win"); // Clean up legacy key
         RegCloseKey(hKey);
         return (res == ERROR_SUCCESS);
     }
     else
     {
-        LONG res = RegDeleteValueW(hKey, L"xow-win");
+        LONG res = RegDeleteValueW(hKey, L"xwa-arm64");
         RegCloseKey(hKey);
         return (res == ERROR_SUCCESS || res == ERROR_FILE_NOT_FOUND);
     }
@@ -324,7 +325,7 @@ static void showCustomKeysDialog(HWND hParent)
 
     g_hCustomKeysWnd = CreateWindowExW(
         WS_EX_DLGMODALFRAME | WS_EX_TOPMOST,
-        L"XowWinCustomKeysWnd",
+        L"XwaArm64CustomKeysWnd",
         L"Configure Custom Keystrokes",
         WS_POPUP | WS_CAPTION | WS_SYSMENU | WS_VISIBLE,
         x, y, width, height,
@@ -438,7 +439,7 @@ static LRESULT CALLBACK SettingsWndProc(HWND hwnd, UINT msg, WPARAM wParam, LPAR
         SendMessageW(hLblHint, WM_SETFONT, (WPARAM)g_hFont, TRUE);
 
         // Auto-Start Checkbox
-        HWND hChkAutoStart = CreateWindowExW(0, L"BUTTON", L"Start xow-win automatically with Windows (run in system tray)",
+        HWND hChkAutoStart = CreateWindowExW(0, L"BUTTON", L"Start xwa-arm64 automatically with Windows (run in system tray)",
             WS_CHILD | WS_VISIBLE | BS_AUTOCHECKBOX, 30, 388, 450, 20, hwnd, (HMENU)IDC_CHK_AUTOSTART, NULL, NULL);
         SendMessageW(hChkAutoStart, WM_SETFONT, (WPARAM)g_hFont, TRUE);
         SendMessageW(hChkAutoStart, BM_SETCHECK, isAutoStartEnabled() ? BST_CHECKED : BST_UNCHECKED, 0);
@@ -537,7 +538,7 @@ static LRESULT CALLBACK TrayWndProc(HWND hwnd, UINT msg, WPARAM wParam, LPARAM l
             GetCursorPos(&pt);
 
             HMENU hMenu = CreatePopupMenu();
-            AppendMenuW(hMenu, MF_STRING | MF_DISABLED, IDM_HEADER, L"xow-win v1.0.0");
+            AppendMenuW(hMenu, MF_STRING | MF_DISABLED, IDM_HEADER, L"xwa-arm64 v1.0.0 (ARM64)");
 
             std::wstring statusStr = L"Dongle: Active";
             if (g_controllerConnected)
@@ -619,7 +620,7 @@ bool SystemTray::init(HINSTANCE hInstance, PairCallback onPair, ExitCallback onE
     wc.cbSize = sizeof(WNDCLASSEXW);
     wc.lpfnWndProc = TrayWndProc;
     wc.hInstance = hInstance;
-    wc.lpszClassName = L"XowWinTrayWnd";
+    wc.lpszClassName = L"XwaArm64TrayWnd";
     RegisterClassExW(&wc);
 
     WNDCLASSEXW swc = {};
@@ -627,7 +628,7 @@ bool SystemTray::init(HINSTANCE hInstance, PairCallback onPair, ExitCallback onE
     swc.lpfnWndProc = SettingsWndProc;
     swc.hInstance = hInstance;
     swc.hbrBackground = (HBRUSH)(COLOR_BTNFACE + 1);
-    swc.lpszClassName = L"XowWinSettingsWnd";
+    swc.lpszClassName = L"XwaArm64SettingsWnd";
     RegisterClassExW(&swc);
 
     WNDCLASSEXW ckwc = {};
@@ -635,10 +636,10 @@ bool SystemTray::init(HINSTANCE hInstance, PairCallback onPair, ExitCallback onE
     ckwc.lpfnWndProc = CustomKeysWndProc;
     ckwc.hInstance = hInstance;
     ckwc.hbrBackground = (HBRUSH)(COLOR_BTNFACE + 1);
-    ckwc.lpszClassName = L"XowWinCustomKeysWnd";
+    ckwc.lpszClassName = L"XwaArm64CustomKeysWnd";
     RegisterClassExW(&ckwc);
 
-    g_hTrayWnd = CreateWindowExW(0, L"XowWinTrayWnd", L"", 0, 0, 0, 0, 0, HWND_MESSAGE, NULL, hInstance, NULL);
+    g_hTrayWnd = CreateWindowExW(0, L"XwaArm64TrayWnd", L"", 0, 0, 0, 0, 0, HWND_MESSAGE, NULL, hInstance, NULL);
     if (!g_hTrayWnd)
     {
         Log::error("Failed to create tray window");
@@ -668,7 +669,7 @@ bool SystemTray::init(HINSTANCE hInstance, PairCallback onPair, ExitCallback onE
         hCustomIcon = LoadIconW(NULL, (LPCWSTR)IDI_APPLICATION);
     }
     g_nid.hIcon = hCustomIcon;
-    wcscpy_s(g_nid.szTip, L"xow-win: Xbox Wireless Adapter");
+    wcscpy_s(g_nid.szTip, L"xwa-arm64: Xbox Wireless Adapter (ARM64)");
 
     Shell_NotifyIconW(NIM_ADD, &g_nid);
     return true;
@@ -680,15 +681,15 @@ void SystemTray::updateStatus(bool dongleActive, bool controllerConnected, const
     g_controllerConnected = controllerConnected;
     g_batteryLevel = batteryLevel;
 
-    std::wstring tip = L"xow-win: Xbox Wireless Adapter";
+    std::wstring tip = L"xwa-arm64: Xbox Wireless Adapter (ARM64)";
     if (controllerConnected)
     {
         std::wstring b(batteryLevel.begin(), batteryLevel.end());
-        tip = L"xow-win: Controller connected (" + b + L")";
+        tip = L"xwa-arm64: Controller connected (" + b + L")";
     }
     else if (!dongleActive)
     {
-        tip = L"xow-win: Waiting for adapter...";
+        tip = L"xwa-arm64: Waiting for adapter...";
     }
 
     wcsncpy_s(g_nid.szTip, tip.c_str(), sizeof(g_nid.szTip) / sizeof(wchar_t) - 1);
@@ -712,8 +713,8 @@ void SystemTray::showSettingsDialog()
 
     g_hSettingsWnd = CreateWindowExW(
         WS_EX_DLGMODALFRAME | WS_EX_TOPMOST,
-        L"XowWinSettingsWnd",
-        L"xow-win Settings",
+        L"XwaArm64SettingsWnd",
+        L"xwa-arm64 Settings",
         WS_POPUP | WS_CAPTION | WS_SYSMENU | WS_VISIBLE,
         x, y, width, height,
         NULL, NULL, GetModuleHandleW(NULL), NULL

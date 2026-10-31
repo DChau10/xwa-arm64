@@ -14,7 +14,7 @@
 #include <windows.h>
 #endif
 
-#define XOW_WIN_VERSION "1.0.0"
+#define XWA_ARM64_VERSION "1.0.0"
 
 static std::atomic<bool> g_running{true};
 static Dongle* g_currentDongle = nullptr;
@@ -24,7 +24,7 @@ static BOOL WINAPI consoleCtrlHandler(DWORD signal)
 {
     if (signal == CTRL_C_EVENT || signal == CTRL_BREAK_EVENT || signal == CTRL_CLOSE_EVENT)
     {
-        Log::info("Shutdown signal received, closing xow-win...");
+        Log::info("Shutdown signal received, closing xwa-arm64...");
         g_running = false;
         return TRUE;
     }
@@ -43,7 +43,7 @@ int main(int argc, char *argv[])
     Log::init();
 
     Log::info("==================================================");
-    Log::info("  xow-win v%s (Xbox Wireless Adapter for Windows)", XOW_WIN_VERSION);
+    Log::info("  xwa-arm64 v%s (Xbox Wireless Adapter for Windows ARM64)", XWA_ARM64_VERSION);
     Log::info("  Derived from xow by Severin v. W. / Medusalix");
     Log::info("==================================================");
 
@@ -68,7 +68,7 @@ int main(int argc, char *argv[])
         }
         else if (arg == "--help" || arg == "-h")
         {
-            std::cout << "Usage: xow-win [OPTIONS]\n"
+            std::cout << "Usage: xwa-arm64 [OPTIONS]\n"
                       << "Options:\n"
                       << "  -p, --pair      Enable wireless pairing mode on startup\n"
                       << "  -s, --settings  Open settings window on startup\n"
@@ -188,6 +188,6 @@ int main(int argc, char *argv[])
     }
 
     SystemTray::getInstance().shutdown();
-    Log::info("xow-win stopped.");
+    Log::info("xwa-arm64 stopped.");
     return 0;
 }

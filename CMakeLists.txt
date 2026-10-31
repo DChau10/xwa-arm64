@@ -1,5 +1,5 @@
 cmake_minimum_required(VERSION 3.16)
-project(xow-win LANGUAGES C CXX)
+project(xwa-arm64 LANGUAGES C CXX)
 
 set(CMAKE_CXX_STANDARD 17)
 set(CMAKE_CXX_STANDARD_REQUIRED ON)
@@ -89,18 +89,18 @@ set(SOURCES
     src/ui/action_dispatcher.cpp
     src/ui/tray.h
     src/ui/tray.cpp
-    res/xow-win.rc
+    res/xwa-arm64.rc
 )
 
-add_executable(xow-win ${SOURCES})
+add_executable(xwa-arm64 ${SOURCES})
 
-target_include_directories(xow-win PRIVATE
+target_include_directories(xwa-arm64 PRIVATE
     src
     ${vigemclient_SOURCE_DIR}/include
     ${libusb_SOURCE_DIR}/libusb
 )
 
-target_link_libraries(xow-win PRIVATE
+target_link_libraries(xwa-arm64 PRIVATE
     ViGEmClient
     libusb
     setupapi
@@ -108,6 +108,6 @@ target_link_libraries(xow-win PRIVATE
 )
 
 if(MSVC)
-    target_compile_options(xow-win PRIVATE /W3 /utf-8 /permissive-)
-    target_link_options(xow-win PRIVATE /SUBSYSTEM:CONSOLE)
+    target_compile_options(xwa-arm64 PRIVATE /W3 /utf-8 /permissive-)
+    target_link_options(xwa-arm64 PRIVATE /SUBSYSTEM:CONSOLE)
 endif()
