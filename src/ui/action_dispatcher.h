@@ -7,6 +7,7 @@ class ActionDispatcher
 public:
     static bool isSteamGameForeground();
     static void sendKeyCombination(const KeyBinding &binding);
-    static void executeTapAction(const Settings &settings);
-    static void executeHoldAction(const Settings &settings);
+    static bool executeTapAction(const Settings &settings);
+    static bool executeHoldAction(const Settings &settings);
+    static bool executeHold2Action(const Settings &settings);
 };

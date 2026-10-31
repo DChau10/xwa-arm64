@@ -9,10 +9,23 @@
 #include <mutex>
 #include <condition_variable>
 #include <memory>
+#include <chrono>
+
+enum class HapticPattern
+{
+    None = 0,
+    NotchTier1,
+    NotchTier2,
+    SuccessTap,
+    SuccessTier1,
+    SuccessTier2,
+    FailureOrCancel
+};
 
 /*
  * Forwards gamepad events to virtual input device (ViGEmBus)
  * Passes force feedback rumble effects back to physical controller
+ * Manages multi-tiered haptic progress bar and LED feedback for Share button
  */
 class Controller : public GipDevice
 {
@@ -37,6 +50,10 @@ private:
     /* Rumble feedback received from PC game */
     void onRumbleReceived(uint8_t largeMotor, uint8_t smallMotor);
 
+    /* Haptic and LED feedback worker */
+    void triggerFeedback(HapticPattern pattern);
+    void feedbackWorker();
+
     std::unique_ptr<IVirtualGamepad> gamepad;
     GamepadState currentState;
 
@@ -46,9 +63,21 @@ private:
     std::condition_variable rumbleCondition;
     Buffer<RumbleData> rumbleBuffer;
 
+    /* Share button haptic & LED background worker */
+    std::thread feedbackThread;
+    std::mutex feedbackMutex;
+    std::condition_variable feedbackCondition;
+    std::atomic<bool> stopFeedbackThread{false};
+    HapticPattern queuedFeedback = HapticPattern::None;
+
     uint8_t batteryLevel = 0xff;
     bool initialized = false;
+
+    /* Share button multi-tier state tracking */
     bool shareWasPressed = false;
-    bool shareHoldTriggered = false;
+    bool tier1NotchTriggered = false;
+    bool tier2NotchTriggered = false;
+    bool cancelTriggered = false;
     std::chrono::steady_clock::time_point sharePressStartTime;
+    std::chrono::steady_clock::time_point lastRampUpdateTime;
 };

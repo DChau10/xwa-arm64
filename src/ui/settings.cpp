@@ -77,6 +77,18 @@ Settings Settings::load(const std::string &configPath)
             s.gameBarClip.shift = (modVal & 0x04) != 0;
         }
 
+        size = sizeof(DWORD);
+        if (RegQueryValueExW(hKey, L"CustomShortcut_ToggleRecordingKey", NULL, NULL, (LPBYTE)&keyVal, &size) == ERROR_SUCCESS && keyVal != 0)
+        {
+            size = sizeof(DWORD);
+            RegQueryValueExW(hKey, L"CustomShortcut_ToggleRecordingModifiers", NULL, NULL, (LPBYTE)&modVal, &size);
+            s.gameBarToggle.vkCode = static_cast<uint8_t>(keyVal);
+            s.gameBarToggle.win = (modVal & 0x08) != 0;
+            s.gameBarToggle.alt = (modVal & 0x01) != 0;
+            s.gameBarToggle.ctrl = (modVal & 0x02) != 0;
+            s.gameBarToggle.shift = (modVal & 0x04) != 0;
+        }
+
         RegCloseKey(hKey);
     }
 
@@ -103,11 +115,15 @@ Settings Settings::load(const std::string &configPath)
         else if (key == "provider") s.provider = static_cast<CaptureProvider>(std::stoi(val));
         else if (key == "tapAction") s.tapAction = static_cast<TapAction>(std::stoi(val));
         else if (key == "holdAction") s.holdAction = static_cast<HoldAction>(std::stoi(val));
+        else if (key == "hold2Action") s.hold2Action = static_cast<HoldAction>(std::stoi(val));
+        else if (key == "hapticMode") s.hapticMode = static_cast<HapticMode>(std::stoi(val));
         else if (key == "holdDurationMs") s.holdDurationMs = std::stoi(val);
-        else if (key == "hapticFeedback") s.hapticFeedback = (val == "true" || val == "1");
+        else if (key == "hold2DurationMs") s.hold2DurationMs = std::stoi(val);
+        else if (key == "cancelDurationMs") s.cancelDurationMs = std::stoi(val);
     }
 
-    Log::info("Loaded settings from %s (Share Button: %s)", path.c_str(), s.enableShareButton ? "ENABLED" : "DISABLED");
+    Log::info("Loaded settings from %s (Share: %s, HapticMode: %d)", path.c_str(),
+              s.enableShareButton ? "ENABLED" : "DISABLED", static_cast<int>(s.hapticMode));
     return s;
 }
 
@@ -126,8 +142,11 @@ bool Settings::save(const std::string &configPath) const
          << "  \"provider\": " << static_cast<int>(provider) << ",\n"
          << "  \"tapAction\": " << static_cast<int>(tapAction) << ",\n"
          << "  \"holdAction\": " << static_cast<int>(holdAction) << ",\n"
+         << "  \"hold2Action\": " << static_cast<int>(hold2Action) << ",\n"
+         << "  \"hapticMode\": " << static_cast<int>(hapticMode) << ",\n"
          << "  \"holdDurationMs\": " << holdDurationMs << ",\n"
-         << "  \"hapticFeedback\": " << (hapticFeedback ? "true" : "false") << "\n"
+         << "  \"hold2DurationMs\": " << hold2DurationMs << ",\n"
+         << "  \"cancelDurationMs\": " << cancelDurationMs << "\n"
          << "}\n";
 
     Log::info("Saved settings to %s", path.c_str());
