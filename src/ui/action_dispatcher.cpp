@@ -64,23 +64,23 @@ void ActionDispatcher::sendKeyCombination(const KeyBinding &binding)
     SendInput(static_cast<UINT>(inputs.size()), inputs.data(), sizeof(INPUT));
 }
 
-void ActionDispatcher::executeTapAction(const Settings &settings)
+bool ActionDispatcher::executeTapAction(const Settings &settings)
 {
-    if (!settings.enableShareButton || settings.tapAction == TapAction::Disabled) return;
+    if (!settings.enableShareButton || settings.tapAction == TapAction::Disabled) return false;
 
     Log::info("Share Button: Tap triggered");
 
     if (settings.tapAction == TapAction::CustomKey)
     {
         sendKeyCombination(settings.customTap);
-        return;
+        return true;
     }
 
     if (settings.tapAction == TapAction::SteamMarker)
     {
         Log::info("Triggering Steam Timeline Marker (Ctrl+F11)");
         sendKeyCombination(settings.steamClip);
-        return;
+        return true;
     }
 
     // Default: Screenshot
@@ -96,25 +96,27 @@ void ActionDispatcher::executeTapAction(const Settings &settings)
         Log::info("Triggering Windows Game Bar Screenshot (Win+Alt+PrtScn)");
         sendKeyCombination(settings.gameBarScreenshot);
     }
+
+    return true;
 }
 
-void ActionDispatcher::executeHoldAction(const Settings &settings)
+bool ActionDispatcher::executeHoldAction(const Settings &settings)
 {
-    if (!settings.enableShareButton || settings.holdAction == HoldAction::Disabled) return;
+    if (!settings.enableShareButton || settings.holdAction == HoldAction::Disabled) return false;
 
-    Log::info("Share Button: Long press (Hold) triggered");
+    Log::info("Share Button: Tier 1 Hold (1s) triggered");
 
     if (settings.holdAction == HoldAction::CustomKey)
     {
         sendKeyCombination(settings.customHold);
-        return;
+        return true;
     }
 
     if (settings.holdAction == HoldAction::ToggleRecording)
     {
         Log::info("Triggering Game Bar Toggle Recording (Win+Alt+R)");
         sendKeyCombination(settings.gameBarToggle);
-        return;
+        return true;
     }
 
     // Default: Record Clip / Last 30s
@@ -130,4 +132,39 @@ void ActionDispatcher::executeHoldAction(const Settings &settings)
         Log::info("Triggering Windows Game Bar Record Last 30s (Win+Alt+G)");
         sendKeyCombination(settings.gameBarClip);
     }
+
+    return true;
+}
+
+bool ActionDispatcher::executeHold2Action(const Settings &settings)
+{
+    if (!settings.enableShareButton || settings.hold2Action == HoldAction::Disabled) return false;
+
+    Log::info("Share Button: Tier 2 Hold (2s) triggered");
+
+    if (settings.hold2Action == HoldAction::CustomKey)
+    {
+        sendKeyCombination(settings.customHold2);
+        return true;
+    }
+
+    if (settings.hold2Action == HoldAction::RecordClip)
+    {
+        bool inSteam = isSteamGameForeground();
+        if (settings.provider == CaptureProvider::SteamOnly ||
+            (settings.provider == CaptureProvider::Auto && inSteam))
+        {
+            sendKeyCombination(settings.steamClip);
+        }
+        else
+        {
+            sendKeyCombination(settings.gameBarClip);
+        }
+        return true;
+    }
+
+    // Default for Hold 2: Toggle Recording
+    Log::info("Triggering Game Bar / Steam Toggle Recording (Win+Alt+R)");
+    sendKeyCombination(settings.gameBarToggle);
+    return true;
 }

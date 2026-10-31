@@ -22,9 +22,16 @@ enum class TapAction : int
 enum class HoldAction : int
 {
     RecordClip = 0,         // Steam Save Clip / Game Bar Record Last 30s (Win+Alt+G)
-    ToggleRecording = 1,    // Game Bar / Steam Record Toggle
+    ToggleRecording = 1,    // Game Bar / Steam Record Toggle (Win+Alt+R)
     CustomKey = 2,
     Disabled = 3
+};
+
+enum class HapticMode : int
+{
+    Advanced = 0,           // Ascending ramp + physical detents + synchronized LED
+    Simple = 1,             // Single confirmation pulse
+    Off = 2                 // Silent (no rumble)
 };
 
 struct KeyBinding
@@ -42,8 +49,11 @@ struct Settings
     CaptureProvider provider = CaptureProvider::Auto;
     TapAction tapAction = TapAction::Screenshot;
     HoldAction holdAction = HoldAction::RecordClip;
-    int holdDurationMs = 800;
-    bool hapticFeedback = true;
+    HoldAction hold2Action = HoldAction::ToggleRecording; // 2-second hold tier
+    HapticMode hapticMode = HapticMode::Advanced;
+    int holdDurationMs = 1000;  // Tier 1 threshold (1 second)
+    int hold2DurationMs = 2000; // Tier 2 threshold (2 seconds)
+    int cancelDurationMs = 3000;// Abort / cancel threshold (3 seconds)
 
     // Default Keybindings
     KeyBinding steamScreenshot = { 0x7B, false, false, false, false };       // VK_F12
@@ -53,6 +63,7 @@ struct Settings
     KeyBinding gameBarToggle = { 0x52, true, false, true, false };          // Win + Alt + 'R'
     KeyBinding customTap = { 0x7B, false, false, false, false };            // VK_F12
     KeyBinding customHold = { 0x47, true, false, true, false };             // Win + Alt + 'G'
+    KeyBinding customHold2 = { 0x52, true, false, true, false };            // Win + Alt + 'R'
 
     static std::string getDefaultConfigPath();
     static Settings load(const std::string &path = "");

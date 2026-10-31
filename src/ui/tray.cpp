@@ -22,9 +22,10 @@
 #define IDC_CMB_PROVIDER 2002
 #define IDC_CMB_TAP 2003
 #define IDC_CMB_HOLD 2004
-#define IDC_CHK_HAPTIC 2005
-#define IDC_BTN_SAVE 2006
-#define IDC_BTN_CANCEL 2007
+#define IDC_CMB_HOLD2 2005
+#define IDC_CMB_HAPTIC 2006
+#define IDC_BTN_SAVE 2007
+#define IDC_BTN_CANCEL 2008
 
 static HWND g_hTrayWnd = NULL;
 static HWND g_hSettingsWnd = NULL;
@@ -48,21 +49,21 @@ static LRESULT CALLBACK SettingsWndProc(HWND hwnd, UINT msg, WPARAM wParam, LPAR
 
         // Group Box: Share Button
         HWND hGroup = CreateWindowExW(0, L"BUTTON", L" Xbox Wireless Controller (Share Button Settings) ",
-            WS_CHILD | WS_VISIBLE | BS_GROUPBOX, 15, 10, 470, 240, hwnd, NULL, NULL, NULL);
+            WS_CHILD | WS_VISIBLE | BS_GROUPBOX, 15, 10, 470, 350, hwnd, NULL, NULL, NULL);
         SendMessageW(hGroup, WM_SETFONT, (WPARAM)g_hFont, TRUE);
 
         // Enable Checkbox
         HWND hChkEnable = CreateWindowExW(0, L"BUTTON", L"Enable Share Button Actions (Opt-in)",
-            WS_CHILD | WS_VISIBLE | BS_AUTOCHECKBOX, 30, 35, 350, 20, hwnd, (HMENU)IDC_CHK_ENABLE, NULL, NULL);
+            WS_CHILD | WS_VISIBLE | BS_AUTOCHECKBOX, 30, 32, 420, 20, hwnd, (HMENU)IDC_CHK_ENABLE, NULL, NULL);
         SendMessageW(hChkEnable, WM_SETFONT, (WPARAM)g_hFont, TRUE);
 
         // Capture Provider Label & Combo
         HWND hLblProv = CreateWindowExW(0, L"STATIC", L"Capture Mode / Provider:",
-            WS_CHILD | WS_VISIBLE, 30, 65, 200, 16, hwnd, NULL, NULL, NULL);
+            WS_CHILD | WS_VISIBLE, 30, 56, 250, 16, hwnd, NULL, NULL, NULL);
         SendMessageW(hLblProv, WM_SETFONT, (WPARAM)g_hFont, TRUE);
 
         HWND hCmbProv = CreateWindowExW(0, L"COMBOBOX", NULL,
-            WS_CHILD | WS_VISIBLE | CBS_DROPDOWNLIST | WS_VSCROLL, 30, 85, 435, 120, hwnd, (HMENU)IDC_CMB_PROVIDER, NULL, NULL);
+            WS_CHILD | WS_VISIBLE | CBS_DROPDOWNLIST | WS_VSCROLL, 30, 74, 435, 120, hwnd, (HMENU)IDC_CMB_PROVIDER, NULL, NULL);
         SendMessageW(hCmbProv, WM_SETFONT, (WPARAM)g_hFont, TRUE);
         SendMessageW(hCmbProv, CB_ADDSTRING, 0, (LPARAM)L"Auto-Detect (Steam Recording in Steam games, Game Bar otherwise)");
         SendMessageW(hCmbProv, CB_ADDSTRING, 0, (LPARAM)L"Steam Game Recording Only (F12 Screenshot / Ctrl+F11 Clip)");
@@ -70,43 +71,69 @@ static LRESULT CALLBACK SettingsWndProc(HWND hwnd, UINT msg, WPARAM wParam, LPAR
         SendMessageW(hCmbProv, CB_ADDSTRING, 0, (LPARAM)L"Custom Keybindings");
 
         // Tap Action Label & Combo
-        HWND hLblTap = CreateWindowExW(0, L"STATIC", L"Single Tap Action (< 800ms):",
-            WS_CHILD | WS_VISIBLE, 30, 115, 200, 16, hwnd, NULL, NULL, NULL);
+        HWND hLblTap = CreateWindowExW(0, L"STATIC", L"Single Tap Action (< 1.0s):",
+            WS_CHILD | WS_VISIBLE, 30, 104, 250, 16, hwnd, NULL, NULL, NULL);
         SendMessageW(hLblTap, WM_SETFONT, (WPARAM)g_hFont, TRUE);
 
         HWND hCmbTap = CreateWindowExW(0, L"COMBOBOX", NULL,
-            WS_CHILD | WS_VISIBLE | CBS_DROPDOWNLIST | WS_VSCROLL, 30, 135, 435, 120, hwnd, (HMENU)IDC_CMB_TAP, NULL, NULL);
+            WS_CHILD | WS_VISIBLE | CBS_DROPDOWNLIST | WS_VSCROLL, 30, 122, 435, 120, hwnd, (HMENU)IDC_CMB_TAP, NULL, NULL);
         SendMessageW(hCmbTap, WM_SETFONT, (WPARAM)g_hFont, TRUE);
         SendMessageW(hCmbTap, CB_ADDSTRING, 0, (LPARAM)L"Take Screenshot (Steam F12 / Game Bar Win+Alt+PrtScn)");
         SendMessageW(hCmbTap, CB_ADDSTRING, 0, (LPARAM)L"Add Marker in Steam Timeline (Ctrl + F11)");
         SendMessageW(hCmbTap, CB_ADDSTRING, 0, (LPARAM)L"Custom Keystroke");
         SendMessageW(hCmbTap, CB_ADDSTRING, 0, (LPARAM)L"Disabled");
 
-        // Hold Action Label & Combo
-        HWND hLblHold = CreateWindowExW(0, L"STATIC", L"Long Press Hold Action (>= 800ms):",
-            WS_CHILD | WS_VISIBLE, 30, 165, 250, 16, hwnd, NULL, NULL, NULL);
+        // Hold Action Label & Combo - Tier 1
+        HWND hLblHold = CreateWindowExW(0, L"STATIC", L"Hold Action — Tier 1 (1.0s – 2.0s hold):",
+            WS_CHILD | WS_VISIBLE, 30, 152, 300, 16, hwnd, NULL, NULL, NULL);
         SendMessageW(hLblHold, WM_SETFONT, (WPARAM)g_hFont, TRUE);
 
         HWND hCmbHold = CreateWindowExW(0, L"COMBOBOX", NULL,
-            WS_CHILD | WS_VISIBLE | CBS_DROPDOWNLIST | WS_VSCROLL, 30, 185, 435, 120, hwnd, (HMENU)IDC_CMB_HOLD, NULL, NULL);
+            WS_CHILD | WS_VISIBLE | CBS_DROPDOWNLIST | WS_VSCROLL, 30, 170, 435, 120, hwnd, (HMENU)IDC_CMB_HOLD, NULL, NULL);
         SendMessageW(hCmbHold, WM_SETFONT, (WPARAM)g_hFont, TRUE);
         SendMessageW(hCmbHold, CB_ADDSTRING, 0, (LPARAM)L"Save Recent Clip (Steam Clip / Game Bar Win+Alt+G 30s)");
         SendMessageW(hCmbHold, CB_ADDSTRING, 0, (LPARAM)L"Toggle Recording Start / Stop (Win + Alt + R)");
         SendMessageW(hCmbHold, CB_ADDSTRING, 0, (LPARAM)L"Custom Keystroke");
         SendMessageW(hCmbHold, CB_ADDSTRING, 0, (LPARAM)L"Disabled");
 
-        // Haptic feedback Checkbox
-        HWND hChkHaptic = CreateWindowExW(0, L"BUTTON", L"Vibrate controller (rumble feedback) when long press triggers",
-            WS_CHILD | WS_VISIBLE | BS_AUTOCHECKBOX, 30, 215, 420, 20, hwnd, (HMENU)IDC_CHK_HAPTIC, NULL, NULL);
-        SendMessageW(hChkHaptic, WM_SETFONT, (WPARAM)g_hFont, TRUE);
+        // Hold Action Label & Combo - Tier 2
+        HWND hLblHold2 = CreateWindowExW(0, L"STATIC", L"Hold Action — Tier 2 (2.0s – 3.0s hold):",
+            WS_CHILD | WS_VISIBLE, 30, 200, 300, 16, hwnd, NULL, NULL, NULL);
+        SendMessageW(hLblHold2, WM_SETFONT, (WPARAM)g_hFont, TRUE);
+
+        HWND hCmbHold2 = CreateWindowExW(0, L"COMBOBOX", NULL,
+            WS_CHILD | WS_VISIBLE | CBS_DROPDOWNLIST | WS_VSCROLL, 30, 218, 435, 120, hwnd, (HMENU)IDC_CMB_HOLD2, NULL, NULL);
+        SendMessageW(hCmbHold2, WM_SETFONT, (WPARAM)g_hFont, TRUE);
+        SendMessageW(hCmbHold2, CB_ADDSTRING, 0, (LPARAM)L"Toggle Recording Start / Stop (Win + Alt + R)");
+        SendMessageW(hCmbHold2, CB_ADDSTRING, 0, (LPARAM)L"Save Recent Clip (Steam Clip / Game Bar Win+Alt+G 30s)");
+        SendMessageW(hCmbHold2, CB_ADDSTRING, 0, (LPARAM)L"Custom Keystroke");
+        SendMessageW(hCmbHold2, CB_ADDSTRING, 0, (LPARAM)L"Disabled");
+
+        // Haptic feedback Combo
+        HWND hLblHaptic = CreateWindowExW(0, L"STATIC", L"Controller Haptic & LED Feedback:",
+            WS_CHILD | WS_VISIBLE, 30, 248, 300, 16, hwnd, NULL, NULL, NULL);
+        SendMessageW(hLblHaptic, WM_SETFONT, (WPARAM)g_hFont, TRUE);
+
+        HWND hCmbHaptic = CreateWindowExW(0, L"COMBOBOX", NULL,
+            WS_CHILD | WS_VISIBLE | CBS_DROPDOWNLIST | WS_VSCROLL, 30, 266, 435, 120, hwnd, (HMENU)IDC_CMB_HAPTIC, NULL, NULL);
+        SendMessageW(hCmbHaptic, WM_SETFONT, (WPARAM)g_hFont, TRUE);
+        SendMessageW(hCmbHaptic, CB_ADDSTRING, 0, (LPARAM)L"Advanced (Ascending ramps, hardware detent notches, LED blinks)");
+        SendMessageW(hCmbHaptic, CB_ADDSTRING, 0, (LPARAM)L"Simple (Single confirmation buzz)");
+        SendMessageW(hCmbHaptic, CB_ADDSTRING, 0, (LPARAM)L"Off (Silent / No vibration)");
+
+        // Hint text
+        HWND hLblHint = CreateWindowExW(0, L"STATIC",
+            L"• Ramping vibration indicates hold progression; click detent fires at 1s and 2s.\n• Release after detent to trigger. Holding 3s+ cancels without firing.",
+            WS_CHILD | WS_VISIBLE, 30, 300, 435, 34, hwnd, NULL, NULL, NULL);
+        SendMessageW(hLblHint, WM_SETFONT, (WPARAM)g_hFont, TRUE);
 
         // Bottom buttons
         HWND hBtnSave = CreateWindowExW(0, L"BUTTON", L"Save & Apply",
-            WS_CHILD | WS_VISIBLE | BS_DEFPUSHBUTTON, 280, 265, 100, 28, hwnd, (HMENU)IDC_BTN_SAVE, NULL, NULL);
+            WS_CHILD | WS_VISIBLE | BS_DEFPUSHBUTTON, 260, 370, 110, 28, hwnd, (HMENU)IDC_BTN_SAVE, NULL, NULL);
         SendMessageW(hBtnSave, WM_SETFONT, (WPARAM)g_hFont, TRUE);
 
         HWND hBtnCancel = CreateWindowExW(0, L"BUTTON", L"Cancel",
-            WS_CHILD | WS_VISIBLE | BS_PUSHBUTTON, 390, 265, 95, 28, hwnd, (HMENU)IDC_BTN_CANCEL, NULL, NULL);
+            WS_CHILD | WS_VISIBLE | BS_PUSHBUTTON, 380, 370, 105, 28, hwnd, (HMENU)IDC_BTN_CANCEL, NULL, NULL);
         SendMessageW(hBtnCancel, WM_SETFONT, (WPARAM)g_hFont, TRUE);
 
         // Populate controls from current settings
@@ -115,7 +142,8 @@ static LRESULT CALLBACK SettingsWndProc(HWND hwnd, UINT msg, WPARAM wParam, LPAR
         SendMessageW(hCmbProv, CB_SETCURSEL, static_cast<int>(s.provider), 0);
         SendMessageW(hCmbTap, CB_SETCURSEL, static_cast<int>(s.tapAction), 0);
         SendMessageW(hCmbHold, CB_SETCURSEL, static_cast<int>(s.holdAction), 0);
-        SendMessageW(hChkHaptic, BM_SETCHECK, s.hapticFeedback ? BST_CHECKED : BST_UNCHECKED, 0);
+        SendMessageW(hCmbHold2, CB_SETCURSEL, static_cast<int>(s.hold2Action), 0);
+        SendMessageW(hCmbHaptic, CB_SETCURSEL, static_cast<int>(s.hapticMode), 0);
 
         return 0;
     }
@@ -130,7 +158,8 @@ static LRESULT CALLBACK SettingsWndProc(HWND hwnd, UINT msg, WPARAM wParam, LPAR
             s.provider = static_cast<CaptureProvider>(SendMessageW(GetDlgItem(hwnd, IDC_CMB_PROVIDER), CB_GETCURSEL, 0, 0));
             s.tapAction = static_cast<TapAction>(SendMessageW(GetDlgItem(hwnd, IDC_CMB_TAP), CB_GETCURSEL, 0, 0));
             s.holdAction = static_cast<HoldAction>(SendMessageW(GetDlgItem(hwnd, IDC_CMB_HOLD), CB_GETCURSEL, 0, 0));
-            s.hapticFeedback = (SendMessageW(GetDlgItem(hwnd, IDC_CHK_HAPTIC), BM_GETCHECK, 0, 0) == BST_CHECKED);
+            s.hold2Action = static_cast<HoldAction>(SendMessageW(GetDlgItem(hwnd, IDC_CMB_HOLD2), CB_GETCURSEL, 0, 0));
+            s.hapticMode = static_cast<HapticMode>(SendMessageW(GetDlgItem(hwnd, IDC_CMB_HAPTIC), CB_GETCURSEL, 0, 0));
 
             s.save();
             setGlobalSettings(s);
@@ -308,7 +337,7 @@ void SystemTray::showSettingsDialog()
     }
 
     int width = 515;
-    int height = 345;
+    int height = 450;
     int screenW = GetSystemMetrics(SM_CXSCREEN);
     int screenH = GetSystemMetrics(SM_CYSCREEN);
     int x = (screenW - width) / 2;
