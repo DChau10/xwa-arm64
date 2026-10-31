@@ -1,6 +1,6 @@
 # xow-win
 
-**xow-win** is a user-mode Windows driver and service for the official **Microsoft Xbox Wireless Adapter** (both the Model 1713 original bulky adapter and Model 1790 slim adapter).
+**xow-win** is an open-source, user-mode Windows driver and service for the official **Microsoft Xbox Wireless Adapter** (both the Model 1713 original bulky adapter and Model 1790 slim adapter).
 
 It enables the Xbox Wireless Adapter to work seamlessly on **Windows on ARM64** (such as Snapdragon X Elite, Snapdragon X Plus, Surface Pro X, and Surface Laptop Copilot+ PCs) as well as standard **x64/x86 Windows**, without requiring Microsoft's missing ARM64 kernel drivers or disabling Driver Signature Enforcement.
 
@@ -14,7 +14,7 @@ Microsoft never released an ARM64-compatible version of `mt7612us.sys` (the Medi
 
 ### How xow-win Solves This
 1. **Zero Kernel Modification:** Binds the adapter to Microsoft's in-box, WHQL-signed generic USB driver (**`WinUSB.sys`**) using a simple `.inf` file.
-2. **User-Space Transceiver Driver:** Communicates with the MediaTek MT7612U wireless chip over WinUSB/libusb, boots the proprietary firmware (`FW_ACC_00U.bin`), broadcasts Xbox Wireless 802.11 beacon frames, and handles pairing.
+2. **User-Space Transceiver Driver:** Communicates with the MediaTek MT7612U wireless chip over WinUSB/libusb, boots the official firmware (`FW_ACC_00U.bin`), broadcasts Xbox Wireless 802.11 beacon frames, and handles pairing.
 3. **Virtual Gamepad Integration:** Translates controller inputs into virtual Xbox 360 gamepads using **ViGEmBus**, with bidirectional force feedback (rumble) support across all PC games.
 
 ---
@@ -46,11 +46,17 @@ Microsoft never released an ARM64-compatible version of `mt7612us.sys` (the Medi
    * What this does automatically:
      * Checks for and installs the official signed **ViGEmBus** driver if not already installed.
      * Registers the WinUSB driver package for the Xbox dongle via `pnputil`.
-     * Installs the firmware binary (`FW_ACC_00U.bin`) into `%ProgramData%\xow-win`.
+     * **Firmware Acquisition:** Because proprietary firmware cannot legally be redistributed, the script automatically downloads Microsoft's official driver cabinet from `download.windowsupdate.com`, extracts `FW_ACC_00U.bin` using Windows built-in `expand.exe`, verifies its SHA-256 hash, and saves it to `%ProgramData%\xow-win`.
      * Configures `xow-win.exe` to run in the background on startup.
 
 3. Plug in your Xbox Wireless Adapter.
 4. Press the pairing button on the adapter and on your Xbox controller to connect!
+
+### Manual Firmware Download (Optional)
+If you just want to download the firmware separately:
+```powershell
+.\scripts\get-firmware.ps1
+```
 
 ### Uninstallation
 To completely remove `xow-win` and restore your system:
@@ -79,7 +85,7 @@ Users often ask why `xow-win` uses ViGEmBus rather than Microsoft's internal `xb
 ## Building from Source
 
 ### Requirements
-* [Visual Studio 2022](https://visualstudio.microsoft.com/) with C++ Desktop Development tools.
+* [Visual Studio 2022](https://visualstudio.microsoft.com/) with C++ Desktop Development tools (or standalone MSVC Build Tools).
 * [CMake 3.16+](https://cmake.org/).
 * Git.
 

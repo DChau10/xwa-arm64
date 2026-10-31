@@ -1,10 +1,14 @@
-# Prerequisites
+# Prerequisites & binaries
 *.d
 *.obj
 *.o
 *.lib
 *.dll
 *.exe
+
+# Proprietary firmware blobs
+*.bin
+firmware/*.bin
 
 # Build directories
 build/
