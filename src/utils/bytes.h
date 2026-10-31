@@ -159,8 +159,8 @@ public:
     inline Bytes toBytes(size_t count) const
     {
         return Bytes(
-            data.begin(),
-            data.begin() + count
+            data.data(),
+            data.data() + count
         );
     }
 
