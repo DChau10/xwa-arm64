@@ -52,11 +52,15 @@ Microsoft never released an ARM64-compatible version of `mt7612us.sys` (the Medi
 3. Plug in your Xbox Wireless Adapter.
 4. Press the pairing button on the adapter and on your Xbox controller to connect!
 
-### Manual Firmware Download (Optional)
-If you just want to download the firmware separately:
-```powershell
-.\scripts\get-firmware.ps1
-```
+### Standalone Helper Scripts (Optional)
+* **Download ViGEmBus installer:**
+  ```powershell
+  .\scripts\get-vigem.ps1
+  ```
+* **Download official adapter firmware:**
+  ```powershell
+  .\scripts\get-firmware.ps1
+  ```
 
 ### Uninstallation
 To completely remove `xow-win` and restore your system:
