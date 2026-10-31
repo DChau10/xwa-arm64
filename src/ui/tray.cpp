@@ -15,6 +15,7 @@
 #define WM_TRAYICON (WM_APP + 1)
 #define IDM_HEADER 1001
 #define IDM_STATUS 1002
+#define IDM_INSTALL_DRIVER 1007
 #define IDM_SETTINGS 1003
 #define IDM_PAIR 1004
 #define IDM_AUTOSTART 1006
@@ -77,7 +78,9 @@ static HWND g_hSettingsWnd = NULL;
 static NOTIFYICONDATAW g_nid = {};
 static SystemTray::PairCallback g_onPair;
 static SystemTray::ExitCallback g_onExit;
+static SystemTray::InstallDriverCallback g_onInstallDriver;
 
+static DriverUiState g_driverUiState = DriverUiState::WaitingUnplugged;
 static bool g_dongleActive = false;
 static bool g_controllerConnected = false;
 static std::string g_batteryLevel = "unknown";
@@ -354,7 +357,7 @@ static LRESULT CALLBACK SettingsWndProc(HWND hwnd, UINT msg, WPARAM wParam, LPAR
 
         // Group Box: Share Button
         HWND hGroup = CreateWindowExW(0, L"BUTTON", L" Xbox Wireless Controller (Share Button Settings) ",
-            WS_CHILD | WS_VISIBLE | BS_GROUPBOX, 15, 10, 485, 450, hwnd, NULL, NULL, NULL);
+            WS_CHILD | WS_VISIBLE | BS_GROUPBOX, 15, 10, 485, 475, hwnd, NULL, NULL, NULL);
         SendMessageW(hGroup, WM_SETFONT, (WPARAM)g_hFont, TRUE);
 
         // Enable Checkbox
@@ -428,28 +431,30 @@ static LRESULT CALLBACK SettingsWndProc(HWND hwnd, UINT msg, WPARAM wParam, LPAR
 
         // Button to configure custom keystrokes
         HWND hBtnCustom = CreateWindowExW(0, L"BUTTON", L"Configure Custom Keystrokes...",
-            WS_CHILD | WS_VISIBLE | BS_PUSHBUTTON, 30, 300, 230, 26, hwnd, (HMENU)IDC_BTN_CUSTOM_KEYS, NULL, NULL);
+            WS_CHILD | WS_VISIBLE | BS_PUSHBUTTON, 30, 298, 230, 26, hwnd, (HMENU)IDC_BTN_CUSTOM_KEYS, NULL, NULL);
         SendMessageW(hBtnCustom, WM_SETFONT, (WPARAM)g_hFont, TRUE);
 
         // Hint text with generous height so it never cuts off
         HWND hLblHint = CreateWindowExW(0, L"STATIC",
-            L"• Ramping vibration indicates hold progression; detents fire at Tier 1 (1.25s) and Tier 2 (2.5s).\n• Distinct pauses follow each detent. Release anytime after a detent to trigger.",
-            WS_CHILD | WS_VISIBLE, 30, 336, 450, 42, hwnd, NULL, NULL, NULL);
+            L"• Ramping vibration indicates hold progression; detents fire at Tier 1 (1.25s) and Tier 2 (2.5s).\n"
+            L"• Distinct pauses follow each detent. Release anytime after a detent to trigger.\n"
+            L"• Note: Retroactive 30s clips (Win+Alt+G) require 'Record in background' in Windows Gaming Settings.",
+            WS_CHILD | WS_VISIBLE, 30, 332, 450, 58, hwnd, NULL, NULL, NULL);
         SendMessageW(hLblHint, WM_SETFONT, (WPARAM)g_hFont, TRUE);
 
         // Auto-Start Checkbox
         HWND hChkAutoStart = CreateWindowExW(0, L"BUTTON", L"Start xwa-arm64 automatically with Windows (run in system tray)",
-            WS_CHILD | WS_VISIBLE | BS_AUTOCHECKBOX, 30, 388, 450, 20, hwnd, (HMENU)IDC_CHK_AUTOSTART, NULL, NULL);
+            WS_CHILD | WS_VISIBLE | BS_AUTOCHECKBOX, 30, 404, 450, 20, hwnd, (HMENU)IDC_CHK_AUTOSTART, NULL, NULL);
         SendMessageW(hChkAutoStart, WM_SETFONT, (WPARAM)g_hFont, TRUE);
         SendMessageW(hChkAutoStart, BM_SETCHECK, isAutoStartEnabled() ? BST_CHECKED : BST_UNCHECKED, 0);
 
         // Bottom buttons
         HWND hBtnSave = CreateWindowExW(0, L"BUTTON", L"Save && Apply",
-            WS_CHILD | WS_VISIBLE | BS_DEFPUSHBUTTON, 280, 475, 110, 28, hwnd, (HMENU)IDC_BTN_SAVE, NULL, NULL);
+            WS_CHILD | WS_VISIBLE | BS_DEFPUSHBUTTON, 280, 500, 110, 28, hwnd, (HMENU)IDC_BTN_SAVE, NULL, NULL);
         SendMessageW(hBtnSave, WM_SETFONT, (WPARAM)g_hFont, TRUE);
 
         HWND hBtnCancel = CreateWindowExW(0, L"BUTTON", L"Cancel",
-            WS_CHILD | WS_VISIBLE | BS_PUSHBUTTON, 400, 475, 100, 28, hwnd, (HMENU)IDC_BTN_CANCEL, NULL, NULL);
+            WS_CHILD | WS_VISIBLE | BS_PUSHBUTTON, 400, 500, 100, 28, hwnd, (HMENU)IDC_BTN_CANCEL, NULL, NULL);
         SendMessageW(hBtnCancel, WM_SETFONT, (WPARAM)g_hFont, TRUE);
 
         // Populate controls from current settings
@@ -540,7 +545,11 @@ static LRESULT CALLBACK TrayWndProc(HWND hwnd, UINT msg, WPARAM wParam, LPARAM l
             AppendMenuW(hMenu, MF_STRING | MF_DISABLED, IDM_HEADER, L"xwa-arm64 v1.0.0 (ARM64)");
 
             std::wstring statusStr = L"Dongle: Active";
-            if (g_controllerConnected)
+            if (g_driverUiState == DriverUiState::DriverMissing)
+            {
+                statusStr = L"Dongle: WinUSB Driver Required";
+            }
+            else if (g_controllerConnected)
             {
                 std::wstring bStr(g_batteryLevel.begin(), g_batteryLevel.end());
                 statusStr = L"Controller: Connected (Battery: " + bStr + L")";
@@ -551,13 +560,21 @@ static LRESULT CALLBACK TrayWndProc(HWND hwnd, UINT msg, WPARAM wParam, LPARAM l
             }
             else
             {
-                statusStr = L"Controller: None Connected";
+                statusStr = L"Dongle: Active (Listening)";
             }
 
             AppendMenuW(hMenu, MF_STRING | MF_DISABLED, IDM_STATUS, statusStr.c_str());
+
+            if (g_driverUiState == DriverUiState::DriverMissing)
+            {
+                AppendMenuW(hMenu, MF_STRING, IDM_INSTALL_DRIVER, L"⚡ Install WinUSB Driver (One-Click Setup)...");
+            }
+
             AppendMenuW(hMenu, MF_SEPARATOR, 0, NULL);
             AppendMenuW(hMenu, MF_STRING, IDM_SETTINGS, L"Settings...");
-            AppendMenuW(hMenu, MF_STRING, IDM_PAIR, L"Pair New Controller");
+
+            UINT pairFlags = (g_dongleActive ? MF_STRING : (MF_STRING | MF_GRAYED | MF_DISABLED));
+            AppendMenuW(hMenu, pairFlags, IDM_PAIR, L"Pair New Controller");
 
             UINT autoStartFlags = MF_STRING | (isAutoStartEnabled() ? MF_CHECKED : MF_UNCHECKED);
             AppendMenuW(hMenu, autoStartFlags, IDM_AUTOSTART, L"Start with Windows");
@@ -567,6 +584,7 @@ static LRESULT CALLBACK TrayWndProc(HWND hwnd, UINT msg, WPARAM wParam, LPARAM l
 
             SetForegroundWindow(hwnd);
             TrackPopupMenu(hMenu, TPM_RIGHTBUTTON, pt.x, pt.y, 0, hwnd, NULL);
+            PostMessageW(hwnd, WM_NULL, 0, 0);
             DestroyMenu(hMenu);
         }
         return 0;
@@ -575,7 +593,11 @@ static LRESULT CALLBACK TrayWndProc(HWND hwnd, UINT msg, WPARAM wParam, LPARAM l
     case WM_COMMAND:
     {
         int id = LOWORD(wParam);
-        if (id == IDM_SETTINGS)
+        if (id == IDM_INSTALL_DRIVER)
+        {
+            if (g_onInstallDriver) g_onInstallDriver();
+        }
+        else if (id == IDM_SETTINGS)
         {
             SystemTray::getInstance().showSettingsDialog();
         }
@@ -610,10 +632,11 @@ SystemTray &SystemTray::getInstance()
     return instance;
 }
 
-bool SystemTray::init(HINSTANCE hInstance, PairCallback onPair, ExitCallback onExit)
+bool SystemTray::init(HINSTANCE hInstance, PairCallback onPair, ExitCallback onExit, InstallDriverCallback onInstallDriver)
 {
     g_onPair = std::move(onPair);
     g_onExit = std::move(onExit);
+    g_onInstallDriver = std::move(onInstallDriver);
 
     WNDCLASSEXW wc = {};
     wc.cbSize = sizeof(WNDCLASSEXW);
@@ -638,7 +661,7 @@ bool SystemTray::init(HINSTANCE hInstance, PairCallback onPair, ExitCallback onE
     ckwc.lpszClassName = L"XwaArm64CustomKeysWnd";
     RegisterClassExW(&ckwc);
 
-    g_hTrayWnd = CreateWindowExW(0, L"XwaArm64TrayWnd", L"", 0, 0, 0, 0, 0, HWND_MESSAGE, NULL, hInstance, NULL);
+    g_hTrayWnd = CreateWindowExW(0, L"XwaArm64TrayWnd", L"", WS_POPUP, 0, 0, 0, 0, NULL, NULL, hInstance, NULL);
     if (!g_hTrayWnd)
     {
         Log::error("Failed to create tray window");
@@ -674,6 +697,36 @@ bool SystemTray::init(HINSTANCE hInstance, PairCallback onPair, ExitCallback onE
     return true;
 }
 
+void SystemTray::updateDriverState(DriverUiState state)
+{
+    g_driverUiState = state;
+    std::wstring tip = L"xwa-arm64: Xbox Wireless Adapter (ARM64)";
+    if (state == DriverUiState::DriverMissing)
+    {
+        g_dongleActive = false;
+        g_controllerConnected = false;
+        tip = L"xwa-arm64: Adapter detected (WinUSB driver required)";
+    }
+    else if (state == DriverUiState::WaitingUnplugged)
+    {
+        g_dongleActive = false;
+        g_controllerConnected = false;
+        tip = L"xwa-arm64: Waiting for Xbox Adapter...";
+    }
+    else if (state == DriverUiState::Active)
+    {
+        g_dongleActive = true;
+        tip = L"xwa-arm64: Dongle active (listening for controllers)";
+    }
+    wcsncpy_s(g_nid.szTip, tip.c_str(), sizeof(g_nid.szTip) / sizeof(wchar_t) - 1);
+    Shell_NotifyIconW(NIM_MODIFY, &g_nid);
+}
+
+HWND SystemTray::getTrayWindow() const
+{
+    return g_hTrayWnd;
+}
+
 void SystemTray::updateStatus(bool dongleActive, bool controllerConnected, const std::string &batteryLevel)
 {
     g_dongleActive = dongleActive;
@@ -703,8 +756,8 @@ void SystemTray::showSettingsDialog()
         return;
     }
 
-    int width = 535;
-    int height = 555;
+    int width = 545;
+    int height = 585;
     int screenW = GetSystemMetrics(SM_CXSCREEN);
     int screenH = GetSystemMetrics(SM_CYSCREEN);
     int x = (screenW - width) / 2;

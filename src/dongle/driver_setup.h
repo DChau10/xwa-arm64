@@ -1,0 +1,17 @@
+#pragma once
+
+#define WIN32_LEAN_AND_MEAN
+#include <windows.h>
+#include <string>
+
+enum class AdapterDriverStatus {
+    NOT_PRESENT,
+    DRIVER_MISSING,  // Plugged in but lacks WinUSB driver (e.g. Code 28 or unconfigured)
+    WINUSB_READY     // Plugged in and bound to WinUSB.sys
+};
+
+// Check connected hardware status via SetupAPI
+AdapterDriverStatus checkAdapterDriverStatus(std::wstring *outDesc = nullptr, std::wstring *outHardwareId = nullptr);
+
+// Prompts the user and launches the verified Zadig installer to configure WinUSB for the adapter
+bool promptAndInstallWinUsb(HWND hParent);

@@ -155,6 +155,53 @@ UsbDeviceManager::~UsbDeviceManager()
     }
 }
 
+std::unique_ptr<UsbDevice> UsbDeviceManager::tryGetDevice(
+    std::initializer_list<HardwareId> ids,
+    UsbDevice::Terminate terminate
+) {
+    libusb_device **list = nullptr;
+    ssize_t count = libusb_get_device_list(context, &list);
+
+    if (count < 0)
+    {
+        return nullptr;
+    }
+
+    for (ssize_t i = 0; i < count; i++)
+    {
+        libusb_device_descriptor desc = {};
+        if (libusb_get_device_descriptor(list[i], &desc) == 0)
+        {
+            for (const auto &id : ids)
+            {
+                if (desc.idVendor == id.vendorId && desc.idProduct == id.productId)
+                {
+                    libusb_device *matched = list[i];
+                    libusb_ref_device(matched);
+                    libusb_free_device_list(list, 1);
+
+                    Log::info("Found Xbox Wireless Adapter (VID: 0x%04X, PID: 0x%04X)",
+                        desc.idVendor, desc.idProduct);
+
+                    try
+                    {
+                        return std::unique_ptr<UsbDevice>(new UsbDevice(matched, terminate));
+                    }
+                    catch (const std::exception &ex)
+                    {
+                        Log::debug("Found adapter but unable to open (WinUSB driver may be needed): %s", ex.what());
+                        libusb_unref_device(matched);
+                        return nullptr;
+                    }
+                }
+            }
+        }
+    }
+
+    libusb_free_device_list(list, 1);
+    return nullptr;
+}
+
 std::unique_ptr<UsbDevice> UsbDeviceManager::getDevice(
     std::initializer_list<HardwareId> ids,
     UsbDevice::Terminate terminate
@@ -163,35 +210,11 @@ std::unique_ptr<UsbDevice> UsbDeviceManager::getDevice(
 
     while (true)
     {
-        libusb_device **list = nullptr;
-        ssize_t count = libusb_get_device_list(context, &list);
-
-        if (count >= 0)
+        std::unique_ptr<UsbDevice> dev = tryGetDevice(ids, terminate);
+        if (dev)
         {
-            for (ssize_t i = 0; i < count; i++)
-            {
-                libusb_device_descriptor desc = {};
-                if (libusb_get_device_descriptor(list[i], &desc) == 0)
-                {
-                    for (const auto &id : ids)
-                    {
-                        if (desc.idVendor == id.vendorId && desc.idProduct == id.productId)
-                        {
-                            libusb_device *matched = list[i];
-                            libusb_ref_device(matched);
-                            libusb_free_device_list(list, 1);
-
-                            Log::info("Found Xbox Wireless Adapter (VID: 0x%04X, PID: 0x%04X)",
-                                desc.idVendor, desc.idProduct);
-
-                            return std::unique_ptr<UsbDevice>(new UsbDevice(matched, terminate));
-                        }
-                    }
-                }
-            }
-            libusb_free_device_list(list, 1);
+            return dev;
         }
-
         std::this_thread::sleep_for(std::chrono::milliseconds(500));
     }
 }

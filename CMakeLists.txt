@@ -72,6 +72,8 @@ set(SOURCES
     src/utils/buffer.h
     src/dongle/usb.h
     src/dongle/usb.cpp
+    src/dongle/driver_setup.h
+    src/dongle/driver_setup.cpp
     src/dongle/mt76.h
     src/dongle/mt76.cpp
     src/dongle/dongle.h
