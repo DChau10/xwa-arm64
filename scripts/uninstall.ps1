@@ -1,6 +1,6 @@
 <#
 .SYNOPSIS
-    Uninstaller for xow-win (Xbox Wireless Adapter on Windows / ARM64).
+    Uninstaller for xwa-arm64 (Xbox Wireless Adapter on Windows / ARM64).
 #>
 
 [CmdletBinding()]
@@ -11,32 +11,32 @@ $ErrorActionPreference = "Stop"
 # Require Administrator
 $isAdmin = ([Security.Principal.WindowsPrincipal][Security.Principal.WindowsIdentity]::GetCurrent()).IsInRole([Security.Principal.WindowsBuiltInRole]::Administrator)
 if (-not $isAdmin) {
-    Write-Host "[xow-win] Elevating to Administrator..." -ForegroundColor Cyan
+    Write-Host "[xwa-arm64] Elevating to Administrator..." -ForegroundColor Cyan
     Start-Process powershell.exe -ArgumentList ("-NoProfile -ExecutionPolicy Bypass -File `"{0}`"" -f $MyInvocation.MyCommand.Path) -Verb RunAs
     exit
 }
 
 Write-Host "==========================================================" -ForegroundColor Red
-Write-Host "  xow-win: Uninstalling Xbox Wireless Adapter Setup" -ForegroundColor Red
+Write-Host "  xwa-arm64: Uninstalling Xbox Wireless Adapter Setup" -ForegroundColor Red
 Write-Host "==========================================================" -ForegroundColor Red
 
-# 1. Stop any running xow-win process
-$proc = Get-Process -Name "xow-win" -ErrorAction SilentlyContinue
+# 1. Stop any running xwa-arm64 process
+$proc = Get-Process -Name "xwa-arm64" -ErrorAction SilentlyContinue
 if ($proc) {
-    Write-Host "[*] Stopping running xow-win process..." -ForegroundColor Cyan
-    Stop-Process -Name "xow-win" -Force
+    Write-Host "[*] Stopping running xwa-arm64 process..." -ForegroundColor Cyan
+    Stop-Process -Name "xwa-arm64" -Force
 }
 
 # 2. Remove Startup shortcut
 $startupDir = Join-Path $env:APPDATA "Microsoft\Windows\Start Menu\Programs\Startup"
-$shortcutPath = Join-Path $startupDir "xow-win.lnk"
+$shortcutPath = Join-Path $startupDir "xwa-arm64.lnk"
 if (Test-Path $shortcutPath) {
     Remove-Item $shortcutPath -Force
     Write-Host "[+] Removed Startup shortcut." -ForegroundColor Green
 }
 
 # 3. Find and remove xow_dongle.inf OEM driver
-Write-Host "[*] Searching for installed xow-win driver packages in DriverStore..." -ForegroundColor Cyan
+Write-Host "[*] Searching for installed xwa-arm64 driver packages in DriverStore..." -ForegroundColor Cyan
 $drivers = pnputil /enum-drivers
 $oemInf = $null
 for ($i = 0; $i -lt $drivers.Count; $i++) {
@@ -61,7 +61,7 @@ if ($oemInf) {
 }
 
 # 4. Clean program data
-$ProgramDataDir = Join-Path $env:ProgramData "xow-win"
+$ProgramDataDir = Join-Path $env:ProgramData "xwa-arm64"
 if (Test-Path $ProgramDataDir) {
     Remove-Item -Path $ProgramDataDir -Recurse -Force
     Write-Host "[+] Removed $ProgramDataDir" -ForegroundColor Green

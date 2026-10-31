@@ -1,11 +1,11 @@
 <#
 .SYNOPSIS
-    One-click automated installer for xow-win (Xbox Wireless Adapter on Windows ARM64 / x64).
+    One-click automated installer for xwa-arm64 (Xbox Wireless Adapter on Windows ARM64 / x64).
 .DESCRIPTION
     1. Ensures administrator rights (elevates automatically).
     2. Automatically downloads and installs signed ViGEmBus driver if not present.
     3. Registers WinUSB driver for the Xbox Wireless Adapter.
-    4. Downloads/extracts official firmware from Microsoft Update into %ProgramData%\xow-win.
+    4. Downloads/extracts official firmware from Microsoft Update into %ProgramData%\xwa-arm64.
     5. Sets up automatic launch on startup.
 #>
 
@@ -20,20 +20,20 @@ $ErrorActionPreference = "Continue"
 # 1. Require Administrator
 $isAdmin = ([Security.Principal.WindowsPrincipal][Security.Principal.WindowsIdentity]::GetCurrent()).IsInRole([Security.Principal.WindowsBuiltInRole]::Administrator)
 if (-not $isAdmin) {
-    Write-Host "[xow-win] Elevating to Administrator..." -ForegroundColor Cyan
+    Write-Host "[xwa-arm64] Elevating to Administrator..." -ForegroundColor Cyan
     Start-Process powershell.exe -ArgumentList ("-NoProfile -ExecutionPolicy Bypass -File `"{0}`"" -f $MyInvocation.MyCommand.Path) -Verb RunAs
     exit
 }
 
 Write-Host "==========================================================" -ForegroundColor Green
-Write-Host "  xow-win: Xbox Wireless Adapter Setup for Windows" -ForegroundColor Green
+Write-Host "  xwa-arm64: Xbox Wireless Adapter Setup for Windows" -ForegroundColor Green
 Write-Host "==========================================================" -ForegroundColor Green
 Write-Host "Detected Architecture: $env:PROCESSOR_ARCHITECTURE" -ForegroundColor Yellow
 
 $RepoRoot = Resolve-Path "$PSScriptRoot\.."
 $DriverInf = Join-Path $RepoRoot "driver\xow_dongle.inf"
 $FirmwareSrc = Join-Path $RepoRoot "firmware\FW_ACC_00U.bin"
-$ProgramDataDir = Join-Path $env:ProgramData "xow-win"
+$ProgramDataDir = Join-Path $env:ProgramData "xwa-arm64"
 
 # 2. Check and Install ViGEmBus
 if (-not $SkipViGEm) {
@@ -122,16 +122,16 @@ if (Test-Path $targetFw) {
 # 5. Startup Configuration
 if (-not $NoService) {
     Write-Host "`n[*] Step 4/4: Setting up startup service..." -ForegroundColor Cyan
-    $binPath = Join-Path $RepoRoot "bin\xow-win.exe"
+    $binPath = Join-Path $RepoRoot "bin\xwa-arm64.exe"
     if (Test-Path $binPath) {
         $startupDir = Join-Path $env:APPDATA "Microsoft\Windows\Start Menu\Programs\Startup"
-        $shortcutPath = Join-Path $startupDir "xow-win.lnk"
+        $shortcutPath = Join-Path $startupDir "xwa-arm64.lnk"
         
         $wsh = New-Object -ComObject WScript.Shell
         $shortcut = $wsh.CreateShortcut($shortcutPath)
         $shortcut.TargetPath = $binPath
         $shortcut.WorkingDirectory = (Split-Path $binPath)
-        $shortcut.Description = "xow-win Background Controller Service"
+        $shortcut.Description = "xwa-arm64 Background Controller Service"
         $shortcut.Save()
         Write-Host "[+] Created Startup shortcut at $shortcutPath" -ForegroundColor Green
     } else {
@@ -140,10 +140,10 @@ if (-not $NoService) {
 }
 
 Write-Host "`n==========================================================" -ForegroundColor Green
-Write-Host "  Setup Complete! xow-win is ready to use." -ForegroundColor Green
+Write-Host "  Setup Complete! xwa-arm64 is ready to use." -ForegroundColor Green
 Write-Host "==========================================================" -ForegroundColor Green
 Write-Host "1. Plug in your Xbox Wireless Adapter (if not already plugged in)."
-Write-Host "2. Run xow-win or double-click your desktop / startup shortcut."
+Write-Host "2. Run xwa-arm64 or double-click your desktop / startup shortcut."
 Write-Host "3. Turn on your controller and press sync to play!"
 Write-Host ""
 Write-Host "Press any key to exit..."

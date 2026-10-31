@@ -28,9 +28,23 @@ std::string Settings::getDefaultConfigPath()
     char localAppData[MAX_PATH];
     if (SUCCEEDED(SHGetFolderPathA(NULL, CSIDL_LOCAL_APPDATA, NULL, 0, localAppData)))
     {
-        std::string dir = std::string(localAppData) + "\\xow-win";
+        std::string dir = std::string(localAppData) + "\\xwa-arm64";
         CreateDirectoryA(dir.c_str(), NULL);
-        return dir + "\\settings.json";
+        std::string newPath = dir + "\\settings.json";
+
+        // Migrate from legacy xow-win if present
+        std::string oldPath = std::string(localAppData) + "\\xow-win\\settings.json";
+        std::ifstream nf(newPath);
+        if (!nf.good())
+        {
+            std::ifstream of(oldPath);
+            if (of.good())
+            {
+                of.close();
+                CopyFileA(oldPath.c_str(), newPath.c_str(), FALSE);
+            }
+        }
+        return newPath;
     }
 
     return "settings.json";
