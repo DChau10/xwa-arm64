@@ -53,7 +53,6 @@ struct Settings
     HapticMode hapticMode = HapticMode::Advanced;
     int holdDurationMs = 1250;  // Tier 1 threshold (1.25 seconds)
     int hold2DurationMs = 2500; // Tier 2 threshold (2.5 seconds)
-    int cancelDurationMs = 4000;// Abort / cancel threshold (4.0 seconds)
 
     // Default Keybindings
     KeyBinding steamScreenshot = { 0x7B, false, false, false, false };       // VK_F12

@@ -123,7 +123,7 @@ static LRESULT CALLBACK SettingsWndProc(HWND hwnd, UINT msg, WPARAM wParam, LPAR
 
         // Hint text
         HWND hLblHint = CreateWindowExW(0, L"STATIC",
-            L"• Ramping vibration indicates hold progression; click detent fires at 1s and 2s.\n• Release after detent to trigger. Holding 3s+ cancels without firing.",
+            L"• Ramping vibration indicates hold progression; detents fire at Tier 1 (1.25s) and Tier 2 (2.5s).\n• Distinct pauses follow each detent. Release anytime after a detent to trigger.",
             WS_CHILD | WS_VISIBLE, 30, 300, 435, 34, hwnd, NULL, NULL, NULL);
         SendMessageW(hLblHint, WM_SETFONT, (WPARAM)g_hFont, TRUE);
 

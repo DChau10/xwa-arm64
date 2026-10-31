@@ -78,6 +78,5 @@ private:
     std::atomic<bool> isShareHeld{false};
     std::atomic<bool> tier1NotchTriggered{false};
     std::atomic<bool> tier2NotchTriggered{false};
-    std::atomic<bool> cancelTriggered{false};
     std::chrono::steady_clock::time_point sharePressStartTime;
 };

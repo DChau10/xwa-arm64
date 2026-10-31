@@ -202,27 +202,6 @@ void Controller::feedbackWorker()
             auto now = std::chrono::steady_clock::now();
             auto elapsedMs = std::chrono::duration_cast<std::chrono::milliseconds>(now - sharePressStartTime).count();
 
-            if (elapsedMs >= s.cancelDurationMs)
-            {
-                if (!cancelTriggered)
-                {
-                    cancelTriggered = true;
-                    Log::info("Share Button: Held >= %dms, action cancelled/aborted", s.cancelDurationMs);
-                    pulseMotors(50, 20, 100);
-                    std::this_thread::sleep_for(std::chrono::milliseconds(50));
-                    pulseMotors(20, 10, 80);
-                    stopRumble();
-                }
-                std::this_thread::sleep_for(std::chrono::milliseconds(50));
-                continue;
-            }
-
-            if (cancelTriggered)
-            {
-                std::this_thread::sleep_for(std::chrono::milliseconds(50));
-                continue;
-            }
-
             // Pacing & Distinct Pause Boundaries:
             // 0 .. 400ms: Tap grace window (pure silence)
             // 400ms .. holdDurationMs: Tier 1 ascending ramp (15% -> 50% right motor)
@@ -230,10 +209,8 @@ void Controller::feedbackWorker()
             // holdDurationMs .. tier2RampStart: 450ms SILENT RESTING PAUSE (distinct release zone)
             // tier2RampStart .. hold2DurationMs: Tier 2 dual-motor ramp (deep heavy climb)
             // hold2DurationMs: Tier 2 heavy punch + LED blink
-            // hold2DurationMs .. tier2PauseEnd: 350ms SILENT RESTING PAUSE (distinct release zone)
-            // tier2PauseEnd .. cancelDurationMs: Gentle armed plateau
+            // hold2DurationMs+: Silent and locked (release anytime to execute Tier 2)
             int tier2RampStart = s.holdDurationMs + 450;
-            int tier2PauseEnd = s.hold2DurationMs + 350;
 
             if (elapsedMs >= s.hold2DurationMs)
             {
@@ -253,20 +230,9 @@ void Controller::feedbackWorker()
                     setLedMode(led);
                     stopRumble();
                 }
-                else if (elapsedMs >= tier2PauseEnd)
-                {
-                    // Gentle low plateau indicating Tier 2 is armed & ready to release
-                    RumbleData r = {};
-                    r.motors = 0x0f;
-                    r.left = 30;
-                    r.right = 20;
-                    r.duration = 0xff;
-                    r.repeat = 0xeb;
-                    performRumble(r);
-                }
                 else
                 {
-                    // Silent pause window right after Tier 2 punch (distinct release zone)
+                    // Locked in Tier 2: quiet and ready to release anytime
                     stopRumble();
                 }
             }
@@ -465,7 +431,6 @@ void Controller::inputReceived(const InputData *input, bool sharePressed)
         isShareHeld = true;
         tier1NotchTriggered = false;
         tier2NotchTriggered = false;
-        cancelTriggered = false;
         sharePressStartTime = now;
         feedbackCondition.notify_all();
     }
@@ -478,12 +443,6 @@ void Controller::inputReceived(const InputData *input, bool sharePressed)
         stopRumble();
 
         auto elapsedMs = std::chrono::duration_cast<std::chrono::milliseconds>(now - sharePressStartTime).count();
-
-        if (cancelTriggered)
-        {
-            Log::info("Share Button: Released after cancel threshold (%lldms)", elapsedMs);
-            return;
-        }
 
         if (elapsedMs >= settings.hold2DurationMs)
         {
