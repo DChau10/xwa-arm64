@@ -2,6 +2,7 @@
 #include "utils/log.h"
 #include "dongle/usb.h"
 #include "dongle/dongle.h"
+#include "dongle/driver_setup.h"
 #include "ui/settings.h"
 #include "ui/tray.h"
 #include "gamepad/vigem_gamepad.h"
@@ -143,6 +144,11 @@ int main(int argc, char *argv[])
         []() {
             Log::info("Exit requested via System Tray");
             g_running = false;
+            PostQuitMessage(0);
+        },
+        []() {
+            Log::info("WinUSB driver setup requested via System Tray");
+            promptAndInstallWinUsb(SystemTray::getInstance().getTrayWindow());
         }
     );
 
@@ -158,67 +164,121 @@ int main(int argc, char *argv[])
     std::signal(SIGTERM, signalHandler);
 #endif
 
-    UsbDeviceManager manager;
-
-    while (g_running)
+    // Check adapter driver status on startup
+    AdapterDriverStatus initialDriverStatus = checkAdapterDriverStatus();
+    if (initialDriverStatus == AdapterDriverStatus::DRIVER_MISSING)
     {
-        try
+        Log::info("Xbox Wireless Adapter detected, but required WinUSB driver is missing (Code 28).");
+        SystemTray::getInstance().updateDriverState(DriverUiState::DriverMissing);
+        // Prompt the user to install the driver
+        promptAndInstallWinUsb(SystemTray::getInstance().getTrayWindow());
+    }
+
+    // Launch dongle acquisition & controller handling in a dedicated worker thread
+    std::thread dongleThread([&]() {
+        UsbDeviceManager manager;
+
+        while (g_running)
         {
-            SystemTray::getInstance().updateStatus(false, false, "none");
-
-            std::unique_ptr<UsbDevice> device = manager.getDevice({
-                { DONGLE_VID, DONGLE_PID_OLD },
-                { DONGLE_VID, DONGLE_PID_NEW },
-                { DONGLE_VID, DONGLE_PID_ORIGINAL },
-                { DONGLE_VID, DONGLE_PID_SURFACE }
-            }, [&]() {
-                Log::info("Dongle unplugged / disconnected");
-                SystemTray::getInstance().updateStatus(false, false, "none");
-            });
-
-            if (!device || !g_running)
+            // 1. Verify driver status via SetupAPI
+            AdapterDriverStatus driverStatus = checkAdapterDriverStatus();
+            if (driverStatus == AdapterDriverStatus::DRIVER_MISSING)
             {
-                break;
-            }
-
-            Dongle dongle(std::move(device));
-            g_currentDongle = &dongle;
-
-            SystemTray::getInstance().updateStatus(true, false, "none");
-
-            // Automatically enable pairing / reconnection window on startup (PR #176)
-            // Allows turned-on controllers to automatically connect without needing a manual button press
-            Log::info("Enabling automatic controller connection window...");
-            dongle.setPairingStatus(true);
-            requestPair = false;
-
-            Log::info("Dongle is active and listening for controllers.");
-
-            // Keep main thread alive while dongle is running, dispatching tray messages
-            while (g_running)
-            {
-                SystemTray::getInstance().processMessages();
-                std::this_thread::sleep_for(std::chrono::milliseconds(50));
-            }
-
-            g_currentDongle = nullptr;
-        }
-        catch (const std::exception &ex)
-        {
-            g_currentDongle = nullptr;
-            SystemTray::getInstance().updateStatus(false, false, "none");
-            if (g_running)
-            {
-                Log::error("Error: %s", ex.what());
-                Log::info("Retrying in 2 seconds...");
-
-                for (int i = 0; i < 40 && g_running; ++i)
+                SystemTray::getInstance().updateDriverState(DriverUiState::DriverMissing);
+                for (int i = 0; i < 20 && g_running; ++i)
                 {
-                    SystemTray::getInstance().processMessages();
                     std::this_thread::sleep_for(std::chrono::milliseconds(50));
+                }
+                continue;
+            }
+
+            // 2. Attempt to acquire USB device
+            try
+            {
+                std::unique_ptr<UsbDevice> device = manager.tryGetDevice({
+                    { DONGLE_VID, DONGLE_PID_OLD },
+                    { DONGLE_VID, DONGLE_PID_NEW },
+                    { DONGLE_VID, DONGLE_PID_ORIGINAL },
+                    { DONGLE_VID, DONGLE_PID_SURFACE }
+                }, [&]() {
+                    Log::info("Dongle unplugged / disconnected");
+                    SystemTray::getInstance().updateDriverState(DriverUiState::WaitingUnplugged);
+                    g_currentDongle = nullptr;
+                });
+
+                if (!device)
+                {
+                    SystemTray::getInstance().updateDriverState(DriverUiState::WaitingUnplugged);
+                    for (int i = 0; i < 10 && g_running; ++i)
+                    {
+                        std::this_thread::sleep_for(std::chrono::milliseconds(50));
+                    }
+                    continue;
+                }
+
+                Dongle dongle(std::move(device));
+                g_currentDongle = &dongle;
+
+                SystemTray::getInstance().updateDriverState(DriverUiState::Active);
+                SystemTray::getInstance().updateStatus(true, false, "none");
+
+                // Automatically enable pairing / reconnection window on startup (PR #176)
+                Log::info("Enabling automatic controller connection window...");
+                dongle.setPairingStatus(true);
+                requestPair = false;
+
+                Log::info("Dongle is active and listening for controllers.");
+
+                while (g_running && g_currentDongle)
+                {
+                    std::this_thread::sleep_for(std::chrono::milliseconds(100));
+                }
+
+                g_currentDongle = nullptr;
+            }
+            catch (const std::exception &ex)
+            {
+                g_currentDongle = nullptr;
+                SystemTray::getInstance().updateDriverState(DriverUiState::WaitingUnplugged);
+                if (g_running)
+                {
+                    Log::debug("Dongle notice: %s", ex.what());
+                    for (int i = 0; i < 20 && g_running; ++i)
+                    {
+                        std::this_thread::sleep_for(std::chrono::milliseconds(50));
+                    }
                 }
             }
         }
+    });
+
+    // Main thread owns the Win32 message loop - UI is ALWAYS responsive!
+    MSG msg;
+    while (g_running)
+    {
+        while (PeekMessageW(&msg, NULL, 0, 0, PM_REMOVE))
+        {
+            if (msg.message == WM_QUIT)
+            {
+                g_running = false;
+                break;
+            }
+            TranslateMessage(&msg);
+            DispatchMessageW(&msg);
+        }
+
+        if (!g_running)
+        {
+            break;
+        }
+
+        MsgWaitForMultipleObjects(0, NULL, FALSE, 50, QS_ALLINPUT);
+    }
+
+    g_running = false;
+    if (dongleThread.joinable())
+    {
+        dongleThread.join();
     }
 
     SystemTray::getInstance().shutdown();

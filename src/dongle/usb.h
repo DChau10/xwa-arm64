@@ -73,6 +73,11 @@ public:
         UsbDevice::Terminate terminate
     );
 
+    std::unique_ptr<UsbDevice> tryGetDevice(
+        std::initializer_list<HardwareId> ids,
+        UsbDevice::Terminate terminate
+    );
+
 private:
     libusb_context *context = nullptr;
 };
