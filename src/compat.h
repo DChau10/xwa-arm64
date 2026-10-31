@@ -11,6 +11,7 @@
 #include <cstdint>
 #include <ctime>
 #include <string>
+#include <vector>
 
 #if defined(_MSC_VER)
     #define PACKED_STRUCT_BEGIN __pragma(pack(push, 1))
@@ -68,12 +69,73 @@ inline std::string get_firmware_path()
     // 2. Check %ProgramData%\xwa-arm64\FW_ACC_00U.bin
     char* programData = nullptr;
     size_t len = 0;
+    std::string pdPath;
     if (_dupenv_s(&programData, &len, "ProgramData") == 0 && programData) {
-        std::string fwPath = std::string(programData) + "\\xwa-arm64\\FW_ACC_00U.bin";
+        pdPath = std::string(programData) + "\\xwa-arm64";
         free(programData);
+        std::string fwPath = pdPath + "\\FW_ACC_00U.bin";
         DWORD attrib = GetFileAttributesA(fwPath.c_str());
         if (attrib != INVALID_FILE_ATTRIBUTES && !(attrib & FILE_ATTRIBUTE_DIRECTORY)) {
             return fwPath;
+        }
+    } else {
+        pdPath = "C:\\ProgramData\\xwa-arm64";
+    }
+
+    // 3. Auto-download on-demand from Microsoft Update CDN if not found
+    CreateDirectoryA(pdPath.c_str(), NULL);
+    std::string targetFw = pdPath + "\\FW_ACC_00U.bin";
+
+    // Check if get-firmware.ps1 script exists relative to executable
+    std::string scriptPath;
+    if (GetModuleFileNameA(NULL, exePath, MAX_PATH) > 0) {
+        std::string dir = exePath;
+        size_t pos = dir.find_last_of("\\/");
+        if (pos != std::string::npos) {
+            std::string p1 = dir.substr(0, pos + 1) + "get-firmware.ps1";
+            std::string p2 = dir.substr(0, pos + 1) + "..\\scripts\\get-firmware.ps1";
+            if (GetFileAttributesA(p1.c_str()) != INVALID_FILE_ATTRIBUTES) scriptPath = p1;
+            else if (GetFileAttributesA(p2.c_str()) != INVALID_FILE_ATTRIBUTES) scriptPath = p2;
+        }
+    }
+
+    std::string cmd;
+    if (!scriptPath.empty()) {
+        cmd = "powershell.exe -NoProfile -ExecutionPolicy Bypass -File \"" + scriptPath + "\" -DestinationDir \"" + pdPath + "\"";
+    } else {
+        cmd = "powershell.exe -NoProfile -ExecutionPolicy Bypass -Command \""
+              "$u='http://download.windowsupdate.com/c/msdownload/update/driver/drvs/2017/07/1cd6a87c-623f-4407-a52d-c31be49e925c_e19f60808bdcbfbd3c3df6be3e71ffc52e43261e.cab';"
+              "$c=\\\"$env:TEMP\\fw.cab\\\";"
+              "$e=\\\"$env:TEMP\\fwe\\\";"
+              "Invoke-WebRequest -Uri $u -OutFile $c -UseBasicParsing;"
+              "New-Item -ItemType Directory -Path $e -Force | Out-Null;"
+              "& expand.exe $c -F:FW_ACC_00U.bin $e | Out-Null;"
+              "$h=(Get-FileHash -Path \\\"$e\\FW_ACC_00U.bin\\\" -Algorithm SHA256).Hash;"
+              "if ($h -eq '48084D9FA53B9BB04358F3BB127B7495DC8F7BB0B3CA1437BD24EF2B6EABDF66') {"
+              "  Copy-Item \\\"$e\\FW_ACC_00U.bin\\\" -Destination \\\"" + targetFw + "\\\" -Force;"
+              "  Remove-Item $c -Force -ErrorAction SilentlyContinue;"
+              "  Remove-Item $e -Recurse -Force -ErrorAction SilentlyContinue;"
+              "  exit 0;"
+              "} else { exit 1; }\"";
+    }
+
+    STARTUPINFOA si = { sizeof(si) };
+    PROCESS_INFORMATION pi = {};
+    si.dwFlags = STARTF_USESHOWWINDOW;
+    si.wShowWindow = SW_HIDE;
+
+    std::vector<char> cmdBuf(cmd.begin(), cmd.end());
+    cmdBuf.push_back('\0');
+
+    if (CreateProcessA(NULL, cmdBuf.data(), NULL, NULL, FALSE, CREATE_NO_WINDOW, NULL, NULL, &si, &pi)) {
+        WaitForSingleObject(pi.hProcess, 30000);
+        DWORD exitCode = 1;
+        GetExitCodeProcess(pi.hProcess, &exitCode);
+        CloseHandle(pi.hProcess);
+        CloseHandle(pi.hThread);
+
+        if (exitCode == 0 && GetFileAttributesA(targetFw.c_str()) != INVALID_FILE_ATTRIBUTES) {
+            return targetFw;
         }
     }
 
