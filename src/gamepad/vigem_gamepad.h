@@ -24,6 +24,10 @@ public:
     void setRumbleCallback(RumbleCallback callback) override;
     bool isConnected() const override;
 
+    // ViGEmBus driver verification and automated installation prompt
+    static bool isDriverInstalled();
+    static bool ensureDriverInstalled(void *hParent = nullptr);
+
     // Internal static callback invoked by ViGEmBus
     void onNotification(uint8_t largeMotor, uint8_t smallMotor);
 

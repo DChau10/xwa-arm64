@@ -108,7 +108,9 @@ target_link_libraries(xwa-arm64 PRIVATE
     bcrypt
 )
 
+set_target_properties(xwa-arm64 PROPERTIES WIN32_EXECUTABLE TRUE)
+
 if(MSVC)
     target_compile_options(xwa-arm64 PRIVATE /W3 /utf-8 /permissive-)
-    target_link_options(xwa-arm64 PRIVATE /SUBSYSTEM:CONSOLE)
+    target_link_options(xwa-arm64 PRIVATE /ENTRY:mainCRTStartup)
 endif()
