@@ -1066,7 +1066,7 @@ bool Mt76::sendClientPacket(
     WlanFrame wlanFrame = {};
 
     // Frame is sent from AP (DS)
-    // Duration is the time required to transmit (Î¼s)
+    // Duration is the time required to transmit (ÃƒÅ½Ã‚Â¼s)
     wlanFrame.frameControl.type = MT_WLAN_DATA;
     wlanFrame.frameControl.subtype = MT_WLAN_QOS_DATA;
     wlanFrame.frameControl.fromDs = true;
@@ -1409,11 +1409,12 @@ bool Mt76::initChannels()
 
 bool Mt76::loadFirmware()
 {
-    std::ifstream file(FIRMWARE, std::ios::binary | std::ios::ate);
+    std::string fwPath = get_firmware_path();
+    std::ifstream file(fwPath, std::ios::binary | std::ios::ate);
 
     if (!file)
     {
-        Log::error("Failed to open %s", FIRMWARE);
+        Log::error("Failed to open %s", fwPath.c_str());
         Log::info("Run xow-get-firmware.sh to download the firmware");
 
         return false;

@@ -142,7 +142,7 @@ void ViGEmGamepad::updateState(const GamepadState &state)
     report.sThumbRX = state.thumbRX;
     report.sThumbRY = state.thumbRY;
 
-    vigem_target_x360_send_report(client, target, report);
+    vigem_target_x360_update(client, target, report);
 }
 
 void ViGEmGamepad::setRumbleCallback(RumbleCallback callback)

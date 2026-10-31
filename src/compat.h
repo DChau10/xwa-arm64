@@ -1,5 +1,13 @@
 #pragma once
 
+#if defined(_WIN32)
+    #define WIN32_LEAN_AND_MEAN
+    #define NOMINMAX
+    #include <windows.h>
+    #include <intrin.h>
+    #include <stdlib.h>
+#endif
+
 #include <cstdint>
 #include <ctime>
 #include <string>
@@ -8,6 +16,18 @@
     #define PACKED_STRUCT_BEGIN __pragma(pack(push, 1))
     #define PACKED_STRUCT_END __pragma(pack(pop))
     #define PACKED
+
+    inline int portable_ffs(int x)
+    {
+        unsigned long index;
+        if (_BitScanForward(&index, static_cast<unsigned long>(x)))
+        {
+            return static_cast<int>(index + 1);
+        }
+        return 0;
+    }
+    #define __builtin_ffs portable_ffs
+    #define __builtin_bswap32 _byteswap_ulong
 #else
     #define PACKED_STRUCT_BEGIN
     #define PACKED_STRUCT_END
@@ -46,9 +66,11 @@ inline std::string get_firmware_path()
     }
 
     // 2. Check %ProgramData%\xow-win\FW_ACC_00U.bin
-    const char* programData = getenv("ProgramData");
-    if (programData) {
+    char* programData = nullptr;
+    size_t len = 0;
+    if (_dupenv_s(&programData, &len, "ProgramData") == 0 && programData) {
         std::string pdFw = std::string(programData) + "\\xow-win\\FW_ACC_00U.bin";
+        free(programData);
         DWORD attrib = GetFileAttributesA(pdFw.c_str());
         if (attrib != INVALID_FILE_ATTRIBUTES && !(attrib & FILE_ATTRIBUTE_DIRECTORY)) {
             return pdFw;
