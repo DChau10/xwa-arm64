@@ -89,128 +89,222 @@ void Controller::feedbackWorker()
         HapticPattern pattern = HapticPattern::None;
         {
             std::unique_lock<std::mutex> lock(feedbackMutex);
-            feedbackCondition.wait(lock, [this] {
-                return stopFeedbackThread || queuedFeedback != HapticPattern::None;
-            });
+            if (!isShareHeld && queuedFeedback == HapticPattern::None)
+            {
+                feedbackCondition.wait(lock, [this] {
+                    return stopFeedbackThread || isShareHeld || queuedFeedback != HapticPattern::None;
+                });
+            }
 
             if (stopFeedbackThread) break;
-            pattern = queuedFeedback;
-            queuedFeedback = HapticPattern::None;
+
+            if (queuedFeedback != HapticPattern::None)
+            {
+                pattern = queuedFeedback;
+                queuedFeedback = HapticPattern::None;
+            }
         }
 
-        if (getGlobalSettings().hapticMode == HapticMode::Simple)
+        // 1. Process queued confirmation patterns
+        if (pattern != HapticPattern::None)
         {
-            if (pattern == HapticPattern::SuccessTap ||
-                pattern == HapticPattern::SuccessTier1 ||
-                pattern == HapticPattern::SuccessTier2)
+            if (getGlobalSettings().hapticMode == HapticMode::Simple)
             {
-                pulseMotors(50, 50, 100);
+                if (pattern == HapticPattern::SuccessTap ||
+                    pattern == HapticPattern::SuccessTier1 ||
+                    pattern == HapticPattern::SuccessTier2)
+                {
+                    pulseMotors(50, 50, 100);
+                }
+                continue;
+            }
+
+            switch (pattern)
+            {
+            case HapticPattern::SuccessTap:
+            {
+                LedModeData led = {};
+                led.mode = LED_BLINK_FAST;
+                led.brightness = 0x20;
+                setLedMode(led);
+
+                pulseMotors(0, 70, 50);
+
+                std::this_thread::sleep_for(std::chrono::milliseconds(60));
+                led.mode = LED_ON;
+                led.brightness = 0x14;
+                setLedMode(led);
+                break;
+            }
+            case HapticPattern::SuccessTier1:
+            {
+                LedModeData led = {};
+                led.mode = LED_BLINK_FAST;
+                led.brightness = 0x20;
+                setLedMode(led);
+
+                pulseMotors(70, 60, 60);
+                std::this_thread::sleep_for(std::chrono::milliseconds(100));
+                pulseMotors(85, 75, 70);
+                std::this_thread::sleep_for(std::chrono::milliseconds(100));
+
+                led.mode = LED_ON;
+                led.brightness = 0x14;
+                setLedMode(led);
+                break;
+            }
+            case HapticPattern::SuccessTier2:
+            {
+                LedModeData led = {};
+                led.mode = LED_BLINK_FAST;
+                led.brightness = 0x20;
+                setLedMode(led);
+
+                for (int i = 0; i < 3; ++i)
+                {
+                    pulseMotors(static_cast<uint8_t>(75 + i * 10), static_cast<uint8_t>(70 + i * 10), 60);
+                    std::this_thread::sleep_for(std::chrono::milliseconds(80));
+                }
+
+                led.mode = LED_ON;
+                led.brightness = 0x14;
+                setLedMode(led);
+                break;
+            }
+            case HapticPattern::FailureOrCancel:
+            {
+                pulseMotors(50, 20, 100);
+                std::this_thread::sleep_for(std::chrono::milliseconds(50));
+                pulseMotors(20, 10, 80);
+
+                LedModeData led = {};
+                led.mode = LED_ON;
+                led.brightness = 0x14;
+                setLedMode(led);
+                break;
+            }
+            default:
+                break;
             }
             continue;
         }
 
-        switch (pattern)
+        // 2. Continuous time-based ramp while Share button is held down
+        if (isShareHeld)
         {
-        case HapticPattern::NotchTier1:
-        {
-            // Crisp notch detent click at 1.0s
-            LedModeData led = {};
-            led.mode = LED_BLINK_FAST;
-            led.brightness = 0x20;
-            setLedMode(led);
-
-            pulseMotors(25, 80, 60);
-
-            std::this_thread::sleep_for(std::chrono::milliseconds(60));
-            led.mode = LED_ON;
-            led.brightness = 0x14;
-            setLedMode(led);
-            break;
-        }
-        case HapticPattern::NotchTier2:
-        {
-            // Heavy dual punch at 2.0s
-            LedModeData led = {};
-            led.mode = LED_BLINK_FAST;
-            led.brightness = 0x20;
-            setLedMode(led);
-
-            pulseMotors(85, 85, 80);
-
-            std::this_thread::sleep_for(std::chrono::milliseconds(70));
-            led.mode = LED_ON;
-            led.brightness = 0x14;
-            setLedMode(led);
-            break;
-        }
-        case HapticPattern::SuccessTap:
-        {
-            // Crisp shutter click
-            LedModeData led = {};
-            led.mode = LED_BLINK_FAST;
-            led.brightness = 0x20;
-            setLedMode(led);
-
-            pulseMotors(0, 65, 45);
-
-            std::this_thread::sleep_for(std::chrono::milliseconds(60));
-            led.mode = LED_ON;
-            led.brightness = 0x14;
-            setLedMode(led);
-            break;
-        }
-        case HapticPattern::SuccessTier1:
-        {
-            // Double Pulse (Thump... Thump) sync'd with LED double blink
-            LedModeData led = {};
-            led.mode = LED_BLINK_FAST;
-            led.brightness = 0x20;
-            setLedMode(led);
-
-            pulseMotors(70, 60, 60);
-            std::this_thread::sleep_for(std::chrono::milliseconds(100));
-            pulseMotors(85, 75, 70);
-            std::this_thread::sleep_for(std::chrono::milliseconds(100));
-
-            led.mode = LED_ON;
-            led.brightness = 0x14;
-            setLedMode(led);
-            break;
-        }
-        case HapticPattern::SuccessTier2:
-        {
-            // Triple Pulse (Thump... Thump... Thump) sync'd with LED triple blink
-            LedModeData led = {};
-            led.mode = LED_BLINK_FAST;
-            led.brightness = 0x20;
-            setLedMode(led);
-
-            for (int i = 0; i < 3; ++i)
+            const Settings &s = getGlobalSettings();
+            if (!s.enableShareButton || s.hapticMode != HapticMode::Advanced)
             {
-                pulseMotors(static_cast<uint8_t>(75 + i * 10), static_cast<uint8_t>(70 + i * 10), 60);
-                std::this_thread::sleep_for(std::chrono::milliseconds(80));
+                std::this_thread::sleep_for(std::chrono::milliseconds(50));
+                continue;
             }
 
-            led.mode = LED_ON;
-            led.brightness = 0x14;
-            setLedMode(led);
-            break;
-        }
-        case HapticPattern::FailureOrCancel:
-        {
-            // Descending soft fade / wah-wah
-            pulseMotors(50, 20, 100);
-            std::this_thread::sleep_for(std::chrono::milliseconds(50));
-            pulseMotors(20, 10, 80);
+            auto now = std::chrono::steady_clock::now();
+            auto elapsedMs = std::chrono::duration_cast<std::chrono::milliseconds>(now - sharePressStartTime).count();
 
-            LedModeData led = {};
-            led.mode = LED_ON;
-            led.brightness = 0x14;
-            setLedMode(led);
-            break;
-        }
-        default:
-            break;
+            if (elapsedMs >= s.cancelDurationMs)
+            {
+                if (!cancelTriggered)
+                {
+                    cancelTriggered = true;
+                    Log::info("Share Button: Held >= %dms, action cancelled/aborted", s.cancelDurationMs);
+                    pulseMotors(50, 20, 100);
+                    std::this_thread::sleep_for(std::chrono::milliseconds(50));
+                    pulseMotors(20, 10, 80);
+                    stopRumble();
+                }
+                std::this_thread::sleep_for(std::chrono::milliseconds(50));
+                continue;
+            }
+
+            if (cancelTriggered)
+            {
+                std::this_thread::sleep_for(std::chrono::milliseconds(50));
+                continue;
+            }
+
+            if (elapsedMs >= s.hold2DurationMs)
+            {
+                if (!tier2NotchTriggered)
+                {
+                    tier2NotchTriggered = true;
+                    Log::info("Share Button: Tier 2 Detent Reached (2.0s)");
+                    LedModeData led = {};
+                    led.mode = LED_BLINK_FAST;
+                    led.brightness = 0x20;
+                    setLedMode(led);
+
+                    pulseMotors(85, 85, 80);
+
+                    led.mode = LED_ON;
+                    led.brightness = 0x14;
+                    setLedMode(led);
+                }
+                else
+                {
+                    // Plateau vibration indicating Tier 2 is locked
+                    RumbleData r = {};
+                    r.motors = 0x0f;
+                    r.left = 35;
+                    r.right = 35;
+                    r.duration = 0xff;
+                    r.repeat = 0xeb;
+                    performRumble(r);
+                }
+            }
+            else if (elapsedMs >= s.holdDurationMs)
+            {
+                if (!tier1NotchTriggered)
+                {
+                    tier1NotchTriggered = true;
+                    Log::info("Share Button: Tier 1 Detent Reached (1.0s)");
+                    LedModeData led = {};
+                    led.mode = LED_BLINK_FAST;
+                    led.brightness = 0x20;
+                    setLedMode(led);
+
+                    pulseMotors(25, 80, 60);
+
+                    led.mode = LED_ON;
+                    led.brightness = 0x14;
+                    setLedMode(led);
+                }
+                else if (elapsedMs > 1080)
+                {
+                    // Tier 2 ascending ramp (1.0s to 2.0s): Dual motors rising 35% -> 80%
+                    float progress = static_cast<float>(elapsedMs - 1080) / static_cast<float>(s.hold2DurationMs - 1080);
+                    if (progress > 1.0f) progress = 1.0f;
+
+                    uint8_t rPower = static_cast<uint8_t>(35 + progress * 45.0f);
+                    uint8_t lPower = static_cast<uint8_t>(20 + progress * 55.0f);
+
+                    RumbleData r = {};
+                    r.motors = 0x0f;
+                    r.left = lPower;
+                    r.right = rPower;
+                    r.duration = 0xff;
+                    r.repeat = 0xeb;
+                    performRumble(r);
+                }
+            }
+            else if (elapsedMs >= 350)
+            {
+                // Tier 1 ascending ramp (350ms to 1000ms): Right small motor rising 15% -> 45%
+                float progress = static_cast<float>(elapsedMs - 350) / static_cast<float>(s.holdDurationMs - 350);
+                if (progress > 1.0f) progress = 1.0f;
+
+                uint8_t power = static_cast<uint8_t>(15 + progress * 30.0f);
+
+                RumbleData r = {};
+                r.motors = 0x0f;
+                r.left = 0;
+                r.right = power;
+                r.duration = 0xff;
+                r.repeat = 0xeb;
+                performRumble(r);
+            }
+
+            std::this_thread::sleep_for(std::chrono::milliseconds(50));
         }
     }
 }
@@ -337,121 +431,32 @@ void Controller::inputReceived(const InputData *input, bool sharePressed)
     {
         // Rising edge: button just pressed down
         shareWasPressed = true;
+        isShareHeld = true;
         tier1NotchTriggered = false;
         tier2NotchTriggered = false;
         cancelTriggered = false;
         sharePressStartTime = now;
-        lastRampUpdateTime = now;
-    }
-    else if (sharePressed && shareWasPressed)
-    {
-        auto elapsedMs = std::chrono::duration_cast<std::chrono::milliseconds>(now - sharePressStartTime).count();
-
-        if (cancelTriggered)
-        {
-            // User held past cancel threshold; remain silent until released
-            return;
-        }
-
-        if (elapsedMs >= settings.cancelDurationMs)
-        {
-            // Crossed 3-second cancel threshold
-            cancelTriggered = true;
-            Log::info("Share Button: Held >= %dms, action aborted/canceled", settings.cancelDurationMs);
-            if (settings.hapticMode != HapticMode::Off)
-            {
-                triggerFeedback(HapticPattern::FailureOrCancel);
-            }
-            return;
-        }
-
-        if (settings.hapticMode == HapticMode::Advanced)
-        {
-            auto timeSinceLastRamp = std::chrono::duration_cast<std::chrono::milliseconds>(now - lastRampUpdateTime).count();
-
-            if (elapsedMs >= settings.hold2DurationMs)
-            {
-                // Reached Tier 2 (2.0s)
-                if (!tier2NotchTriggered)
-                {
-                    tier2NotchTriggered = true;
-                    triggerFeedback(HapticPattern::NotchTier2);
-                }
-                else if (timeSinceLastRamp >= 60 && elapsedMs < settings.cancelDurationMs)
-                {
-                    // Plateau vibration indicating Tier 2 is locked and ready to release
-                    RumbleData r = {};
-                    r.motors = 0x0f;
-                    r.left = 40; r.right = 40;
-                    r.duration = 0xff;
-                    r.repeat = 0xeb;
-                    performRumble(r);
-                    lastRampUpdateTime = now;
-                }
-            }
-            else if (elapsedMs >= settings.holdDurationMs)
-            {
-                // Reached Tier 1 (1.0s)
-                if (!tier1NotchTriggered)
-                {
-                    tier1NotchTriggered = true;
-                    triggerFeedback(HapticPattern::NotchTier1);
-                }
-                else if (elapsedMs > 1080 && timeSinceLastRamp >= 50)
-                {
-                    // Tier 2 ascending ramp (1.0s to 2.0s): Dual motors rising 35% -> 80%
-                    float progress = static_cast<float>(elapsedMs - 1080) / static_cast<float>(settings.hold2DurationMs - 1080);
-                    if (progress > 1.0f) progress = 1.0f;
-
-                    uint8_t rPower = static_cast<uint8_t>(35 + progress * 45.0f);
-                    uint8_t lPower = static_cast<uint8_t>(20 + progress * 55.0f);
-
-                    RumbleData r = {};
-                    r.motors = 0x0f;
-                    r.left = lPower; r.right = rPower;
-                    r.duration = 0xff;
-                    r.repeat = 0xeb;
-                    performRumble(r);
-                    lastRampUpdateTime = now;
-                }
-            }
-            else if (elapsedMs >= 350 && timeSinceLastRamp >= 50)
-            {
-                // Tier 1 ascending ramp (350ms to 1000ms): Right small motor rising 15% -> 45%
-                float progress = static_cast<float>(elapsedMs - 350) / static_cast<float>(settings.holdDurationMs - 350);
-                if (progress > 1.0f) progress = 1.0f;
-
-                uint8_t power = static_cast<uint8_t>(15 + progress * 30.0f);
-
-                RumbleData r = {};
-                r.motors = 0x0f;
-                r.left = 0;
-                r.right = power;
-                r.duration = 0xff;
-                r.repeat = 0xeb;
-                performRumble(r);
-                lastRampUpdateTime = now;
-            }
-        }
+        feedbackCondition.notify_all();
     }
     else if (!sharePressed && shareWasPressed)
     {
         // Falling edge: button released
         shareWasPressed = false;
-        auto elapsedMs = std::chrono::duration_cast<std::chrono::milliseconds>(now - sharePressStartTime).count();
-
-        // Silence any ongoing ramp rumble immediately
+        isShareHeld = false;
+        feedbackCondition.notify_all();
         stopRumble();
+
+        auto elapsedMs = std::chrono::duration_cast<std::chrono::milliseconds>(now - sharePressStartTime).count();
 
         if (cancelTriggered)
         {
-            // Cancelled, do not execute
+            Log::info("Share Button: Released after cancel threshold (%lldms)", elapsedMs);
             return;
         }
 
         if (elapsedMs >= settings.hold2DurationMs)
         {
-            // Tier 2 Release (>= 2.0s)
+            Log::info("Share Button: Tier 2 Release (%lldms)", elapsedMs);
             bool ok = ActionDispatcher::executeHold2Action(settings);
             if (settings.hapticMode != HapticMode::Off)
             {
@@ -460,7 +465,7 @@ void Controller::inputReceived(const InputData *input, bool sharePressed)
         }
         else if (elapsedMs >= settings.holdDurationMs)
         {
-            // Tier 1 Release (>= 1.0s)
+            Log::info("Share Button: Tier 1 Release (%lldms)", elapsedMs);
             bool ok = ActionDispatcher::executeHoldAction(settings);
             if (settings.hapticMode != HapticMode::Off)
             {
@@ -469,7 +474,7 @@ void Controller::inputReceived(const InputData *input, bool sharePressed)
         }
         else
         {
-            // Tap Release (< 1.0s)
+            Log::info("Share Button: Tap Release (%lldms)", elapsedMs);
             bool ok = ActionDispatcher::executeTapAction(settings);
             if (settings.hapticMode != HapticMode::Off)
             {
