@@ -2,7 +2,7 @@
 .SYNOPSIS
     Downloads and verifies the official ViGEmBus installer (unified ARM64 / x64 / x86).
 .DESCRIPTION
-    ViGEmBus is the Virtual Gamepad Emulation Bus required by xow-win to create
+    ViGEmBus is the Virtual Gamepad Emulation Bus required by xwa-arm64 to create
     virtual Xbox 360 controllers in Windows. This script downloads the official
     signed installer from GitHub and verifies its SHA-256 integrity checksum.
 #>

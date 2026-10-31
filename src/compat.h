@@ -65,20 +65,15 @@ inline std::string get_firmware_path()
         }
     }
 
-    // 2. Check %ProgramData%\xwa-arm64\FW_ACC_00U.bin (with xow-win legacy fallback)
+    // 2. Check %ProgramData%\xwa-arm64\FW_ACC_00U.bin
     char* programData = nullptr;
     size_t len = 0;
     if (_dupenv_s(&programData, &len, "ProgramData") == 0 && programData) {
-        std::string newFw = std::string(programData) + "\\xwa-arm64\\FW_ACC_00U.bin";
-        std::string oldFw = std::string(programData) + "\\xow-win\\FW_ACC_00U.bin";
+        std::string fwPath = std::string(programData) + "\\xwa-arm64\\FW_ACC_00U.bin";
         free(programData);
-        DWORD attrib = GetFileAttributesA(newFw.c_str());
+        DWORD attrib = GetFileAttributesA(fwPath.c_str());
         if (attrib != INVALID_FILE_ATTRIBUTES && !(attrib & FILE_ATTRIBUTE_DIRECTORY)) {
-            return newFw;
-        }
-        attrib = GetFileAttributesA(oldFw.c_str());
-        if (attrib != INVALID_FILE_ATTRIBUTES && !(attrib & FILE_ATTRIBUTE_DIRECTORY)) {
-            return oldFw;
+            return fwPath;
         }
     }
 
