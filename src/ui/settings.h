@@ -51,9 +51,9 @@ struct Settings
     HoldAction holdAction = HoldAction::RecordClip;
     HoldAction hold2Action = HoldAction::ToggleRecording; // 2-second hold tier
     HapticMode hapticMode = HapticMode::Advanced;
-    int holdDurationMs = 1000;  // Tier 1 threshold (1 second)
-    int hold2DurationMs = 2000; // Tier 2 threshold (2 seconds)
-    int cancelDurationMs = 3000;// Abort / cancel threshold (3 seconds)
+    int holdDurationMs = 1250;  // Tier 1 threshold (1.25 seconds)
+    int hold2DurationMs = 2500; // Tier 2 threshold (2.5 seconds)
+    int cancelDurationMs = 4000;// Abort / cancel threshold (4.0 seconds)
 
     // Default Keybindings
     KeyBinding steamScreenshot = { 0x7B, false, false, false, false };       // VK_F12

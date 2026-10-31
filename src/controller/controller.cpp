@@ -223,33 +223,51 @@ void Controller::feedbackWorker()
                 continue;
             }
 
+            // Pacing & Distinct Pause Boundaries:
+            // 0 .. 400ms: Tap grace window (pure silence)
+            // 400ms .. holdDurationMs: Tier 1 ascending ramp (15% -> 50% right motor)
+            // holdDurationMs: Tier 1 detent click + LED blink
+            // holdDurationMs .. tier2RampStart: 450ms SILENT RESTING PAUSE (distinct release zone)
+            // tier2RampStart .. hold2DurationMs: Tier 2 dual-motor ramp (deep heavy climb)
+            // hold2DurationMs: Tier 2 heavy punch + LED blink
+            // hold2DurationMs .. tier2PauseEnd: 350ms SILENT RESTING PAUSE (distinct release zone)
+            // tier2PauseEnd .. cancelDurationMs: Gentle armed plateau
+            int tier2RampStart = s.holdDurationMs + 450;
+            int tier2PauseEnd = s.hold2DurationMs + 350;
+
             if (elapsedMs >= s.hold2DurationMs)
             {
                 if (!tier2NotchTriggered)
                 {
                     tier2NotchTriggered = true;
-                    Log::info("Share Button: Tier 2 Detent Reached (2.0s)");
+                    Log::info("Share Button: Tier 2 Detent Reached (%dms)", s.hold2DurationMs);
                     LedModeData led = {};
                     led.mode = LED_BLINK_FAST;
                     led.brightness = 0x20;
                     setLedMode(led);
 
-                    pulseMotors(85, 85, 80);
+                    pulseMotors(95, 95, 80);
 
                     led.mode = LED_ON;
                     led.brightness = 0x14;
                     setLedMode(led);
+                    stopRumble();
                 }
-                else
+                else if (elapsedMs >= tier2PauseEnd)
                 {
-                    // Plateau vibration indicating Tier 2 is locked
+                    // Gentle low plateau indicating Tier 2 is armed & ready to release
                     RumbleData r = {};
                     r.motors = 0x0f;
-                    r.left = 35;
-                    r.right = 35;
+                    r.left = 30;
+                    r.right = 20;
                     r.duration = 0xff;
                     r.repeat = 0xeb;
                     performRumble(r);
+                }
+                else
+                {
+                    // Silent pause window right after Tier 2 punch (distinct release zone)
+                    stopRumble();
                 }
             }
             else if (elapsedMs >= s.holdDurationMs)
@@ -257,26 +275,28 @@ void Controller::feedbackWorker()
                 if (!tier1NotchTriggered)
                 {
                     tier1NotchTriggered = true;
-                    Log::info("Share Button: Tier 1 Detent Reached (1.0s)");
+                    Log::info("Share Button: Tier 1 Detent Reached (%dms)", s.holdDurationMs);
                     LedModeData led = {};
                     led.mode = LED_BLINK_FAST;
                     led.brightness = 0x20;
                     setLedMode(led);
 
-                    pulseMotors(25, 80, 60);
+                    pulseMotors(20, 85, 60);
 
                     led.mode = LED_ON;
                     led.brightness = 0x14;
                     setLedMode(led);
+                    stopRumble();
                 }
-                else if (elapsedMs > 1080)
+                else if (elapsedMs >= tier2RampStart)
                 {
-                    // Tier 2 ascending ramp (1.0s to 2.0s): Dual motors rising 35% -> 80%
-                    float progress = static_cast<float>(elapsedMs - 1080) / static_cast<float>(s.hold2DurationMs - 1080);
+                    // Tier 2 ascending ramp: Dual motors rising
+                    float progress = static_cast<float>(elapsedMs - tier2RampStart) /
+                                     static_cast<float>(s.hold2DurationMs - tier2RampStart);
                     if (progress > 1.0f) progress = 1.0f;
 
-                    uint8_t rPower = static_cast<uint8_t>(35 + progress * 45.0f);
-                    uint8_t lPower = static_cast<uint8_t>(20 + progress * 55.0f);
+                    uint8_t rPower = static_cast<uint8_t>(30 + progress * 55.0f);
+                    uint8_t lPower = static_cast<uint8_t>(20 + progress * 60.0f);
 
                     RumbleData r = {};
                     r.motors = 0x0f;
@@ -286,14 +306,20 @@ void Controller::feedbackWorker()
                     r.repeat = 0xeb;
                     performRumble(r);
                 }
+                else
+                {
+                    // Silent resting pause window right after Tier 1 detent (distinct release zone)
+                    stopRumble();
+                }
             }
-            else if (elapsedMs >= 350)
+            else if (elapsedMs >= 400)
             {
-                // Tier 1 ascending ramp (350ms to 1000ms): Right small motor rising 15% -> 45%
-                float progress = static_cast<float>(elapsedMs - 350) / static_cast<float>(s.holdDurationMs - 350);
+                // Tier 1 ascending ramp: Right small motor rising 15% -> 50%
+                float progress = static_cast<float>(elapsedMs - 400) /
+                                 static_cast<float>(s.holdDurationMs - 400);
                 if (progress > 1.0f) progress = 1.0f;
 
-                uint8_t power = static_cast<uint8_t>(15 + progress * 30.0f);
+                uint8_t power = static_cast<uint8_t>(15 + progress * 35.0f);
 
                 RumbleData r = {};
                 r.motors = 0x0f;
@@ -302,6 +328,11 @@ void Controller::feedbackWorker()
                 r.duration = 0xff;
                 r.repeat = 0xeb;
                 performRumble(r);
+            }
+            else
+            {
+                // Initial 400ms tap grace window: silence
+                stopRumble();
             }
 
             std::this_thread::sleep_for(std::chrono::milliseconds(50));
