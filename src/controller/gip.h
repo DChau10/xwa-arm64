@@ -35,7 +35,7 @@ protected:
     };
 
     // Controller input can be paused temporarily
-    enum PowerMode
+    enum PowerMode : uint8_t
     {
         POWER_ON = 0x00,
         POWER_SLEEP = 0x01,
@@ -117,23 +117,27 @@ protected:
 
     struct InputData
     {
-        struct
+        union
         {
-            uint16_t unknown : 2;
-            uint16_t start : 1;
-            uint16_t select : 1;
-            uint16_t a : 1;
-            uint16_t b : 1;
-            uint16_t x : 1;
-            uint16_t y : 1;
-            uint16_t dpadUp : 1;
-            uint16_t dpadDown : 1;
-            uint16_t dpadLeft : 1;
-            uint16_t dpadRight : 1;
-            uint16_t bumperLeft : 1;
-            uint16_t bumperRight : 1;
-            uint16_t stickLeft : 1;
-            uint16_t stickRight : 1;
+            uint16_t raw;
+            struct
+            {
+                uint16_t unknown : 2;
+                uint16_t start : 1;
+                uint16_t select : 1;
+                uint16_t a : 1;
+                uint16_t b : 1;
+                uint16_t x : 1;
+                uint16_t y : 1;
+                uint16_t dpadUp : 1;
+                uint16_t dpadDown : 1;
+                uint16_t dpadLeft : 1;
+                uint16_t dpadRight : 1;
+                uint16_t bumperLeft : 1;
+                uint16_t bumperRight : 1;
+                uint16_t stickLeft : 1;
+                uint16_t stickRight : 1;
+            };
         } PACKED buttons;
 
         uint16_t triggerLeft;

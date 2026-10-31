@@ -55,75 +55,69 @@ bool GipDevice::handlePacket(const Bytes &packet)
     }
 
     const Frame *frame = packet.toStruct<Frame>();
-    size_t payloadSize = packet.size() - sizeof(Frame);
 
-    // Drop packets with incomplete payload
-    if (payloadSize < frame->length)
+    if ((frame->type & TYPE_ACK) && !acknowledgePacket(*frame))
     {
-        Log::debug("Incomplete packet received");
+        Log::error("Failed to acknowledge packet");
 
+        return false;
+    }
+
+    // Ignore packets from accessories
+    if (frame->deviceId > 0)
+    {
         return true;
     }
 
-    // Acknowledge packets that request it
-    if (frame->type == TYPE_ACK)
-    {
-        if (!acknowledgePacket(*frame))
-        {
-            Log::error("Failed to acknowledge packet");
+    const Bytes data(packet, sizeof(Frame));
 
-            return false;
-        }
+    // Data is 32-bit aligned, check for minimum size
+    if (
+        frame->command == CMD_ANNOUNCE &&
+        frame->length == sizeof(AnnounceData) &&
+        data.size() >= sizeof(AnnounceData)
+    ) {
+        deviceAnnounced(
+            frame->deviceId,
+            data.toStruct<AnnounceData>()
+        );
+    }
+    else if (
+        frame->command == CMD_STATUS &&
+        frame->length == sizeof(StatusData) &&
+        data.size() >= sizeof(StatusData)
+    ) {
+        statusReceived(
+            frame->deviceId,
+            data.toStruct<StatusData>()
+        );
+    }
+    else if (
+        frame->command == CMD_GUIDE_BTN &&
+        frame->length == sizeof(GuideButtonData) &&
+        data.size() >= sizeof(GuideButtonData)
+    ) {
+        guideButtonPressed(data.toStruct<GuideButtonData>());
+    }
+    else if (
+        frame->command == CMD_SERIAL_NUM &&
+        frame->length == sizeof(SerialData) &&
+        data.size() >= sizeof(SerialData)
+    ) {
+        serialNumberReceived(data.toStruct<SerialData>());
+    }
+    // Elite controllers and Xbox Series X|S send a larger input packet
+    // The button remapping is done in hardware
+    // The "non-remapped" input is appended to the packet
+    else if (
+        frame->command == CMD_INPUT &&
+        frame->length >= sizeof(InputData) &&
+        data.size() >= sizeof(InputData)
+    ) {
+        inputReceived(data.toStruct<InputData>());
     }
 
-    switch (frame->command)
-    {
-        case CMD_ANNOUNCE:
-            if (payloadSize >= sizeof(AnnounceData))
-            {
-                deviceAnnounced(
-                    frame->deviceId,
-                    packet.toStruct<AnnounceData>(sizeof(Frame))
-                );
-            }
-            break;
-        case CMD_STATUS:
-            if (payloadSize >= sizeof(StatusData))
-            {
-                statusReceived(
-                    frame->deviceId,
-                    packet.toStruct<StatusData>(sizeof(Frame))
-                );
-            }
-            break;
-        case CMD_GUIDE_BTN:
-            if (payloadSize >= sizeof(GuideButtonData))
-            {
-                guideButtonPressed(
-                    packet.toStruct<GuideButtonData>(sizeof(Frame))
-                );
-            }
-            break;
-        case CMD_SERIAL_NUM:
-            if (payloadSize >= sizeof(SerialData))
-            {
-                serialNumberReceived(
-                    packet.toStruct<SerialData>(sizeof(Frame))
-                );
-            }
-            break;
-        case CMD_INPUT:
-            if (payloadSize >= sizeof(InputData))
-            {
-                inputReceived(
-                    packet.toStruct<InputData>(sizeof(Frame))
-                );
-            }
-            break;
-        default:
-            break;
-    }
-
+    // Ignore any unknown packets
     return true;
 }
 
@@ -133,14 +127,14 @@ bool GipDevice::setPowerMode(uint8_t id, PowerMode mode)
 
     frame.command = CMD_POWER_MODE;
     frame.deviceId = id;
-    frame.type = TYPE_COMMAND;
+    frame.type = TYPE_REQUEST;
     frame.sequence = getSequence();
-    frame.length = sizeof(mode);
+    frame.length = sizeof(uint8_t);
 
     Bytes out;
 
     out.append(frame);
-    out.append(mode);
+    out.append(static_cast<uint8_t>(mode));
 
     return sendPacket(out);
 }
@@ -167,7 +161,7 @@ bool GipDevice::setLedMode(LedModeData mode)
     Frame frame = {};
 
     frame.command = CMD_LED_MODE;
-    frame.type = TYPE_COMMAND;
+    frame.type = TYPE_REQUEST;
     frame.sequence = getSequence();
     frame.length = sizeof(mode);
 
@@ -184,15 +178,14 @@ bool GipDevice::requestSerialNumber()
     Frame frame = {};
 
     frame.command = CMD_SERIAL_NUM;
-    frame.type = TYPE_REQUEST;
+    frame.type = TYPE_REQUEST | TYPE_ACK;
     frame.sequence = getSequence();
     frame.length = sizeof(uint8_t);
 
     Bytes out;
 
+    // The purpose of other values is still to be discovered
     out.append(frame);
-
-    // Request full serial number
     out.append(static_cast<uint8_t>(0x04));
 
     return sendPacket(out);
@@ -200,26 +193,45 @@ bool GipDevice::requestSerialNumber()
 
 bool GipDevice::acknowledgePacket(Frame frame)
 {
-    Frame outFrame = {};
+    Frame header = {};
 
-    outFrame.command = CMD_ACKNOWLEDGE;
-    outFrame.deviceId = frame.deviceId;
-    outFrame.type = TYPE_COMMAND;
-    outFrame.sequence = frame.sequence;
-    outFrame.length = sizeof(uint32_t);
+    header.command = CMD_ACKNOWLEDGE;
+    header.deviceId = frame.deviceId;
+    header.type = TYPE_REQUEST;
+    header.sequence = frame.sequence;
+    header.length = sizeof(header) + 5;
+
+    frame.type = TYPE_REQUEST;
+    frame.sequence = frame.length;
+    frame.length = 0;
 
     Bytes out;
 
-    out.append(outFrame);
-    out.append(static_cast<uint32_t>(0));
+    out.append(header);
+    out.pad(1);
+    out.append(frame);
+    out.pad(4);
 
     return sendPacket(out);
 }
 
 uint8_t GipDevice::getSequence(bool accessory)
 {
-    uint8_t &seq = accessory ? accessorySequence : sequence;
+    if (accessory)
+    {
+        // Zero is an invalid sequence number
+        if (accessorySequence == 0x00)
+        {
+            accessorySequence = 0x01;
+        }
 
-    // Sequence numbers wrap around
-    return seq == 0xff ? seq = 1 : seq++;
+        return accessorySequence++;
+    }
+
+    if (sequence == 0x00)
+    {
+        sequence = 0x01;
+    }
+
+    return sequence++;
 }

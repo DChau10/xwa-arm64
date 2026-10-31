@@ -142,7 +142,16 @@ void ViGEmGamepad::updateState(const GamepadState &state)
     report.sThumbRX = state.thumbRX;
     report.sThumbRY = state.thumbRY;
 
-    vigem_target_x360_update(client, target, report);
+    VIGEM_ERROR err = vigem_target_x360_update(client, target, report);
+    if (!VIGEM_SUCCESS(err))
+    {
+        static bool errorLogged = false;
+        if (!errorLogged)
+        {
+            Log::error("vigem_target_x360_update failed: 0x%08X", err);
+            errorLogged = true;
+        }
+    }
 }
 
 void ViGEmGamepad::setRumbleCallback(RumbleCallback callback)
