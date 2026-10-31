@@ -1466,6 +1466,47 @@ bool Mt76::loadFirmware()
         return false;
     }
 
+#if defined(_WIN32)
+    // Official Microsoft firmware hashes for Xbox Wireless Adapter (FW_ACC_00U.bin):
+    // 1. Canonical current firmware (v1.0.46.x): 48084d9fa53b9bb04358f3bb127b7495dc8f7bb0b3ca1437bd24ef2b6eabdf66 (70,620 bytes)
+    // 2. Original release firmware (v1.0.0.x):   080ce4091e53a4ef3e5fe29939f51fd91f46d6a88be6d67eb6e99a5723b3a223 (70,008 bytes)
+    static const char* const kTrustedFirmwareHashes[] = {
+        "48084d9fa53b9bb04358f3bb127b7495dc8f7bb0b3ca1437bd24ef2b6eabdf66",
+        "080ce4091e53a4ef3e5fe29939f51fd91f46d6a88be6d67eb6e99a5723b3a223"
+    };
+
+    std::string computedHash;
+    if (!calculateSha256(firmware.raw(), firmware.size(), computedHash))
+    {
+        Log::error("Failed to calculate firmware SHA-256 checksum");
+        return false;
+    }
+
+    bool isTrusted = false;
+    for (const char* trusted : kTrustedFirmwareHashes)
+    {
+        if (_stricmp(computedHash.c_str(), trusted) == 0)
+        {
+            isTrusted = true;
+            break;
+        }
+    }
+
+    if (!isTrusted)
+    {
+        Log::error("==================================================================");
+        Log::error("CRITICAL SECURITY ERROR: Firmware checksum validation failed!");
+        Log::error("Firmware file: %s", fwPath.c_str());
+        Log::error("Computed SHA-256: %s", computedHash.c_str());
+        Log::error("Expected official hash: %s", kTrustedFirmwareHashes[0]);
+        Log::error("Untrusted or corrupted firmware detected. Upload aborted to prevent hardware tampering.");
+        Log::error("==================================================================");
+        return false;
+    }
+
+    Log::info("Firmware integrity verified (SHA-256: %s)", computedHash.c_str());
+#endif
+
     if (controlRead(MT_FCE_DMA_ADDR, MT_VEND_READ_CFG))
     {
         Log::debug("Firmware already loaded, resetting...");
