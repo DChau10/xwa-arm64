@@ -42,8 +42,8 @@ if (-not $SkipViGEm) {
         Write-Host "[+] ViGEmBus driver is already installed." -ForegroundColor Green
     } else {
         Write-Host "[*] ViGEmBus not found. Downloading signed ViGEmBus installer..." -ForegroundColor Cyan
-        $viGemUrl = "https://github.com/nefarius/ViGEmBus/releases/download/v1.22.0/ViGEmBus_Setup_1.22.0.exe"
-        $installerPath = Join-Path $env:TEMP "ViGEmBus_Setup.exe"
+        $viGemUrl = "https://github.com/nefarius/ViGEmBus/releases/download/v1.22.0/ViGEmBus_1.22.0_x64_x86_arm64.exe"
+        $installerPath = Join-Path $env:TEMP "ViGEmBus_1.22.0_x64_x86_arm64.exe"
         
         try {
             [Net.ServicePointManager]::SecurityProtocol = [Net.SecurityProtocolType]::Tls12
