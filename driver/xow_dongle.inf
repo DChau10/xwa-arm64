@@ -1,0 +1,67 @@
+;
+; xow_dongle.inf
+; WinUSB driver installation file for Xbox Wireless Adapter for Windows
+; Supports Windows on ARM64, AMD64 (x64), and x86
+;
+
+[Version]
+Signature   = "$Windows NT$"
+Class       = USBDevice
+ClassGUID   = {88BAE032-5A81-49f0-BC3D-A4FF138216D6}
+Provider    = %ProviderName%
+DriverVer   = 10/31/2026,1.0.0.0
+PnpLockdown = 1
+
+[Manufacturer]
+%ManufacturerName% = Standard,NTarm64,NTamd64,NTx86
+
+[Standard.NTarm64]
+%DeviceDesc_02E6% = USB_Install, USB\VID_045E&PID_02E6
+%DeviceDesc_02FE% = USB_Install, USB\VID_045E&PID_02FE
+%DeviceDesc_02D1% = USB_Install, USB\VID_045E&PID_02D1
+%DeviceDesc_091E% = USB_Install, USB\VID_045E&PID_091E
+
+[Standard.NTamd64]
+%DeviceDesc_02E6% = USB_Install, USB\VID_045E&PID_02E6
+%DeviceDesc_02FE% = USB_Install, USB\VID_045E&PID_02FE
+%DeviceDesc_02D1% = USB_Install, USB\VID_045E&PID_02D1
+%DeviceDesc_091E% = USB_Install, USB\VID_045E&PID_091E
+
+[Standard.NTx86]
+%DeviceDesc_02E6% = USB_Install, USB\VID_045E&PID_02E6
+%DeviceDesc_02FE% = USB_Install, USB\VID_045E&PID_02FE
+%DeviceDesc_02D1% = USB_Install, USB\VID_045E&PID_02D1
+%DeviceDesc_091E% = USB_Install, USB\VID_045E&PID_091E
+
+; ================= Class section =====================
+[ClassInstall32]
+AddReg = ClassInstall_AddReg
+
+[ClassInstall_AddReg]
+HKR,,,0,%ClassName%
+HKR,,Icon,,-20
+
+; ================= Installation =====================
+[USB_Install]
+Include = winusb.inf
+Needs   = WINUSB.NT
+
+[USB_Install.Services]
+Include = winusb.inf
+Needs   = WINUSB.NT.Services
+
+[USB_Install.HW]
+AddReg = Dev_AddReg
+
+[Dev_AddReg]
+HKR,,DeviceInterfaceGUIDs,0x10000,"{A5DCBF10-6530-11D2-901F-00C04FB951ED}"
+
+; ================= Strings =====================
+[Strings]
+ProviderName       = "xow-win Project"
+ManufacturerName   = "Microsoft (WinUSB Wrapper)"
+ClassName          = "Universal Serial Bus devices"
+DeviceDesc_02E6    = "Xbox Wireless Adapter for Windows (WinUSB)"
+DeviceDesc_02FE    = "Xbox Wireless Adapter (WinUSB)"
+DeviceDesc_02D1    = "Xbox Wireless Adapter Model 1713 (WinUSB)"
+DeviceDesc_091E    = "Surface Wireless Transceiver (WinUSB)"
