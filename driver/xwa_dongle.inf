@@ -1,5 +1,5 @@
 ;
-; xow_dongle.inf
+; xwa_dongle.inf
 ; WinUSB driver installation file for Xbox Wireless Adapter for Windows
 ; Supports Windows on ARM64, AMD64 (x64), and x86
 ;

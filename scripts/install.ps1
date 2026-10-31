@@ -31,7 +31,7 @@ Write-Host "==========================================================" -Foregro
 Write-Host "Detected Architecture: $env:PROCESSOR_ARCHITECTURE" -ForegroundColor Yellow
 
 $RepoRoot = Resolve-Path "$PSScriptRoot\.."
-$DriverInf = Join-Path $RepoRoot "driver\xow_dongle.inf"
+$DriverInf = Join-Path $RepoRoot "driver\xwa_dongle.inf"
 $FirmwareSrc = Join-Path $RepoRoot "firmware\FW_ACC_00U.bin"
 $ProgramDataDir = Join-Path $env:ProgramData "xwa-arm64"
 

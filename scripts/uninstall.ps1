@@ -35,12 +35,12 @@ if (Test-Path $shortcutPath) {
     Write-Host "[+] Removed Startup shortcut." -ForegroundColor Green
 }
 
-# 3. Find and remove xow_dongle.inf OEM driver
+# 3. Find and remove xwa_dongle.inf OEM driver
 Write-Host "[*] Searching for installed xwa-arm64 driver packages in DriverStore..." -ForegroundColor Cyan
 $drivers = pnputil /enum-drivers
 $oemInf = $null
 for ($i = 0; $i -lt $drivers.Count; $i++) {
-    if ($drivers[$i] -match "xow_dongle.inf") {
+    if ($drivers[$i] -match "xwa_dongle.inf") {
         # Previous line usually contains Published Name: oemXX.inf
         for ($j = $i - 1; $j -ge 0; $j--) {
             if ($drivers[$j] -match "oem(\d+)\.inf") {
@@ -57,7 +57,7 @@ if ($oemInf) {
     pnputil /delete-driver $oemInf /uninstall /force
     Write-Host "[+] Removed $oemInf from DriverStore." -ForegroundColor Green
 } else {
-    Write-Host "[+] No registered xow_dongle OEM driver package found." -ForegroundColor Yellow
+    Write-Host "[+] No registered xwa_dongle OEM driver package found." -ForegroundColor Yellow
 }
 
 # 4. Clean program data
