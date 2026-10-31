@@ -885,6 +885,38 @@ Mt76::~Mt76()
 
 uint8_t Mt76::associateClient(Bytes address)
 {
+    // Check if client is already associated
+    for (uint8_t i = 0; i < MT_WCID_COUNT; ++i)
+    {
+        if ((connectedClients & BIT(i)) && clientAddresses[i] == address)
+        {
+            TxWi reTxWi = {};
+            reTxWi.phyType = MT_PHY_TYPE_OFDM;
+            reTxWi.ack = true;
+            reTxWi.wcid = 0xff;
+            reTxWi.mpduByteCount = sizeof(WlanFrame) + sizeof(AssociationResponseFrame);
+
+            WlanFrame reWlanFrame = {};
+            reWlanFrame.frameControl.type = MT_WLAN_MANAGEMENT;
+            reWlanFrame.frameControl.subtype = MT_WLAN_ASSOCIATION_RESP;
+            address.copy(reWlanFrame.destination);
+            macAddress.copy(reWlanFrame.source);
+            macAddress.copy(reWlanFrame.bssId);
+
+            AssociationResponseFrame reAssocFrame = {};
+            reAssocFrame.statusCode = 0x0110;
+            reAssocFrame.associationId = 0x0f00;
+
+            Bytes reOut;
+            reOut.append(reTxWi);
+            reOut.append(reWlanFrame);
+            reOut.append(reAssocFrame);
+            sendWlanPacket(reOut);
+
+            return i + 1;
+        }
+    }
+
     // Find first available WCID
     uint16_t freeIds = static_cast<uint16_t>(~connectedClients);
     uint8_t wcid = __builtin_ffs(freeIds);
@@ -897,6 +929,7 @@ uint8_t Mt76::associateClient(Bytes address)
     }
 
     connectedClients |= BIT(wcid - 1);
+    clientAddresses[wcid - 1] = address;
 
     TxWi txWi = {};
 
@@ -976,6 +1009,7 @@ bool Mt76::removeClient(uint8_t wcid)
 
     // Remove WCID from connected clients
     connectedClients &= ~BIT(wcid - 1);
+    clientAddresses[wcid - 1].clear();
 
     if (!sendFirmwareCommand(FW_CLIENT_REMOVE, wcidData))
     {

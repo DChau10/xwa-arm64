@@ -47,4 +47,5 @@ private:
     Buffer<RumbleData> rumbleBuffer;
 
     uint8_t batteryLevel = 0xff;
+    bool initialized = false;
 };

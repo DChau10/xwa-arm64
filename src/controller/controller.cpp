@@ -23,7 +23,7 @@ Controller::Controller(
 Controller::~Controller()
 {
     stopRumbleThread = true;
-    rumbleCondition.notify_one();
+    rumbleCondition.notify_all();
 
     if (rumbleThread.joinable())
     {
@@ -43,6 +43,11 @@ Controller::~Controller()
 
 void Controller::deviceAnnounced(uint8_t id, const AnnounceData *announce)
 {
+    if (id != DEVICE_ID_CONTROLLER)
+    {
+        return;
+    }
+
     Log::info("Device announced, vendor: %04x, product id: %04x", announce->vendorId, announce->productId);
     Log::debug(
         "Firmware version: %d.%d.%d.%d",
@@ -52,6 +57,12 @@ void Controller::deviceAnnounced(uint8_t id, const AnnounceData *announce)
         announce->firmwareVersion.revision
     );
 
+    if (initialized)
+    {
+        return;
+    }
+
+    initialized = true;
     initInput(announce);
 }
 
@@ -86,11 +97,13 @@ void Controller::guideButtonPressed(const GuideButtonData *button)
 
 void Controller::serialNumberReceived(const SerialData *serial)
 {
-    const std::string number(
-        serial->serialNumber,
-        sizeof(serial->serialNumber)
-    );
+    size_t len = 0;
+    while (len < sizeof(serial->serialNumber) && serial->serialNumber[len] != '\0')
+    {
+        len++;
+    }
 
+    const std::string number(serial->serialNumber, len);
     Log::info("Controller Serial number: %s", number.c_str());
 }
 
@@ -161,8 +174,12 @@ void Controller::initInput(const AnnounceData *announce)
         return;
     }
 
-    // Start rumble consumer thread
-    rumbleThread = std::thread(&Controller::processRumble, this);
+    // Start rumble consumer thread only if not already running
+    if (!rumbleThread.joinable())
+    {
+        stopRumbleThread = false;
+        rumbleThread = std::thread(&Controller::processRumble, this);
+    }
 }
 
 void Controller::processRumble()
@@ -199,5 +216,5 @@ void Controller::onRumbleReceived(uint8_t largeMotor, uint8_t smallMotor)
     rumble.repeat = 0;
 
     rumbleBuffer.put(rumble);
-    rumbleCondition.notify_one();
+    rumbleCondition.notify_all();
 }

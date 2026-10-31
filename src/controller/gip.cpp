@@ -79,31 +79,46 @@ bool GipDevice::handlePacket(const Bytes &packet)
     switch (frame->command)
     {
         case CMD_ANNOUNCE:
-            deviceAnnounced(
-                frame->deviceId,
-                packet.toStruct<AnnounceData>(sizeof(Frame))
-            );
+            if (payloadSize >= sizeof(AnnounceData))
+            {
+                deviceAnnounced(
+                    frame->deviceId,
+                    packet.toStruct<AnnounceData>(sizeof(Frame))
+                );
+            }
             break;
         case CMD_STATUS:
-            statusReceived(
-                frame->deviceId,
-                packet.toStruct<StatusData>(sizeof(Frame))
-            );
+            if (payloadSize >= sizeof(StatusData))
+            {
+                statusReceived(
+                    frame->deviceId,
+                    packet.toStruct<StatusData>(sizeof(Frame))
+                );
+            }
             break;
         case CMD_GUIDE_BTN:
-            guideButtonPressed(
-                packet.toStruct<GuideButtonData>(sizeof(Frame))
-            );
+            if (payloadSize >= sizeof(GuideButtonData))
+            {
+                guideButtonPressed(
+                    packet.toStruct<GuideButtonData>(sizeof(Frame))
+                );
+            }
             break;
         case CMD_SERIAL_NUM:
-            serialNumberReceived(
-                packet.toStruct<SerialData>(sizeof(Frame))
-            );
+            if (payloadSize >= sizeof(SerialData))
+            {
+                serialNumberReceived(
+                    packet.toStruct<SerialData>(sizeof(Frame))
+                );
+            }
             break;
         case CMD_INPUT:
-            inputReceived(
-                packet.toStruct<InputData>(sizeof(Frame))
-            );
+            if (payloadSize >= sizeof(InputData))
+            {
+                inputReceived(
+                    packet.toStruct<InputData>(sizeof(Frame))
+                );
+            }
             break;
         default:
             break;
