@@ -1,17 +1,42 @@
 #pragma once
 
-#if defined(_WIN32)
-    #define WIN32_LEAN_AND_MEAN
-    #define NOMINMAX
-    #include <windows.h>
-    #include <intrin.h>
-    #include <stdlib.h>
-#endif
-
 #include <cstdint>
 #include <ctime>
 #include <string>
 #include <vector>
+#include <cstdio>
+#include <cstdlib>
+
+#if defined(_WIN32)
+    #define WIN32_LEAN_AND_MEAN
+    #define NOMINMAX
+    #include <windows.h>
+    #include <bcrypt.h>
+    #include <intrin.h>
+    #pragma comment(lib, "bcrypt.lib")
+
+    inline bool calculateSha256(const uint8_t *data, size_t length, std::string &outHex)
+    {
+        BCRYPT_ALG_HANDLE hAlg = NULL;
+        if (BCryptOpenAlgorithmProvider(&hAlg, BCRYPT_SHA256_ALGORITHM, NULL, 0) != 0)
+            return false;
+
+        UCHAR hash[32] = { 0 };
+        NTSTATUS status = BCryptHash(hAlg, NULL, 0, (PUCHAR)data, static_cast<ULONG>(length), hash, sizeof(hash));
+        BCryptCloseAlgorithmProvider(hAlg, 0);
+
+        if (status != 0)
+            return false;
+
+        char hexBuf[65] = { 0 };
+        for (int i = 0; i < 32; ++i)
+        {
+            sprintf_s(hexBuf + (i * 2), 3, "%02x", hash[i]);
+        }
+        outHex = hexBuf;
+        return true;
+    }
+#endif
 
 #if defined(_MSC_VER)
     #define PACKED_STRUCT_BEGIN __pragma(pack(push, 1))

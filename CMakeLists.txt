@@ -105,6 +105,7 @@ target_link_libraries(xwa-arm64 PRIVATE
     libusb
     setupapi
     comctl32
+    bcrypt
 )
 
 if(MSVC)
