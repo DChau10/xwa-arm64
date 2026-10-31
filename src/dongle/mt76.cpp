@@ -1507,11 +1507,15 @@ bool Mt76::loadFirmware()
     Log::info("Firmware integrity verified (SHA-256: %s)", computedHash.c_str());
 #endif
 
-    if (controlRead(MT_FCE_DMA_ADDR, MT_VEND_READ_CFG))
+    uint32_t fceDma = controlRead(MT_FCE_DMA_ADDR, MT_VEND_READ_CFG);
+    Log::info("Initial MT_FCE_DMA_ADDR: 0x%08X", fceDma);
+
+    if (fceDma)
     {
-        Log::debug("Firmware already loaded, resetting...");
+        Log::info("Firmware already loaded, resetting...");
 
         uint32_t patch = controlRead(MT_RF_PATCH, MT_VEND_READ_CFG);
+        Log::info("MT_RF_PATCH: 0x%08X", patch);
 
         patch &= ~BIT(19);
 
@@ -1520,13 +1524,15 @@ bool Mt76::loadFirmware()
         controlWrite(MT_FW_RESET_IVB, 0, MT_VEND_DEV_MODE);
 
         // Wait for firmware to reset
-        bool successful = pollTimeout([this] {
-            return controlRead(MT_FCE_DMA_ADDR, MT_VEND_READ_CFG) != 0x80000000;
+        uint32_t lastVal = 0;
+        bool successful = pollTimeout([&] {
+            lastVal = controlRead(MT_FCE_DMA_ADDR, MT_VEND_READ_CFG);
+            return lastVal != 0x80000000;
         });
 
         if (!successful)
         {
-            Log::error("Firmware reset timed out");
+            Log::error("Firmware reset timed out (lastVal: 0x%08X)", lastVal);
 
             return false;
         }

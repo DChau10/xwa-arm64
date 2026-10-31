@@ -13,5 +13,5 @@ enum class AdapterDriverStatus {
 // Check connected hardware status via SetupAPI
 AdapterDriverStatus checkAdapterDriverStatus(std::wstring *outDesc = nullptr, std::wstring *outHardwareId = nullptr);
 
-// Prompts the user and launches the verified Zadig installer to configure WinUSB for the adapter
-bool promptAndInstallWinUsb(HWND hParent);
+// Shows the persistent floating WinUSB Setup Assistant dialog alongside Device Manager
+void showWinUsbAssistant(HWND hParent = NULL);

@@ -569,6 +569,10 @@ static LRESULT CALLBACK TrayWndProc(HWND hwnd, UINT msg, WPARAM wParam, LPARAM l
             {
                 AppendMenuW(hMenu, MF_STRING, IDM_INSTALL_DRIVER, L"⚡ Configure WinUSB in Device Manager...");
             }
+            else
+            {
+                AppendMenuW(hMenu, MF_STRING, IDM_INSTALL_DRIVER, L"WinUSB Setup Guide...");
+            }
 
             AppendMenuW(hMenu, MF_SEPARATOR, 0, NULL);
             AppendMenuW(hMenu, MF_STRING, IDM_SETTINGS, L"Settings...");
