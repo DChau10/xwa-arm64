@@ -4,6 +4,7 @@
 #include "dongle/dongle.h"
 #include "ui/settings.h"
 #include "ui/tray.h"
+#include "gamepad/vigem_gamepad.h"
 
 #include <iostream>
 #include <atomic>
@@ -40,21 +41,19 @@ static void signalHandler(int signal)
 
 int main(int argc, char *argv[])
 {
-    Log::init();
-
-    Log::info("==================================================");
-    Log::info("  xwa-arm64 v%s (Xbox Wireless Adapter for Windows ARM64)", XWA_ARM64_VERSION);
-    Log::info("  Derived from xow by Severin v. W. / Medusalix");
-    Log::info("==================================================");
-
     bool requestPair = false;
     bool requestSettings = false;
-    bool hideConsole = false;
+    bool showConsole = false;
+    bool showHelp = false;
 
     for (int i = 1; i < argc; ++i)
     {
         std::string arg = argv[i];
-        if (arg == "--pair" || arg == "-p")
+        if (arg == "--console" || arg == "-c")
+        {
+            showConsole = true;
+        }
+        else if (arg == "--pair" || arg == "-p")
         {
             requestPair = true;
         }
@@ -64,30 +63,65 @@ int main(int argc, char *argv[])
         }
         else if (arg == "--hide")
         {
-            hideConsole = true;
+            // Backwards-compatible no-op: quiet GUI is now the default
         }
         else if (arg == "--help" || arg == "-h")
         {
-            std::cout << "Usage: xwa-arm64 [OPTIONS]\n"
-                      << "Options:\n"
-                      << "  -p, --pair      Enable wireless pairing mode on startup\n"
-                      << "  -s, --settings  Open settings window on startup\n"
-                      << "  --hide          Hide console window and run quietly in tray\n"
-                      << "  -h, --help      Display this help message\n";
-            return 0;
+            showHelp = true;
         }
     }
 
 #if defined(_WIN32)
-    if (hideConsole)
+    if (showConsole || showHelp)
     {
-        HWND hConsole = GetConsoleWindow();
-        if (hConsole)
+        DWORD fileType = GetFileType(GetStdHandle(STD_OUTPUT_HANDLE));
+        bool isRedirected = (fileType == FILE_TYPE_DISK || fileType == FILE_TYPE_PIPE);
+
+        if (!isRedirected)
         {
-            ShowWindow(hConsole, SW_HIDE);
+            if (!AttachConsole(ATTACH_PARENT_PROCESS))
+            {
+                AllocConsole();
+            }
+            FILE* fpOut = nullptr;
+            FILE* fpErr = nullptr;
+            freopen_s(&fpOut, "CONOUT$", "w", stdout);
+            freopen_s(&fpErr, "CONOUT$", "w", stderr);
         }
+        std::cout.clear();
+        std::cerr.clear();
     }
 #endif
+
+    Log::init();
+
+    if (showHelp)
+    {
+        std::cout << "\n==================================================\n"
+                  << "  xwa-arm64 v" << XWA_ARM64_VERSION << " (Xbox Wireless Adapter for Windows ARM64)\n"
+                  << "==================================================\n"
+                  << "Usage: xwa-arm64 [OPTIONS]\n\n"
+                  << "Options:\n"
+                  << "  -c, --console   Show real-time diagnostic console and log output\n"
+                  << "  -p, --pair      Enable wireless pairing mode on startup\n"
+                  << "  -s, --settings  Open settings window on startup\n"
+                  << "  -h, --help      Display this help message\n\n";
+        return 0;
+    }
+
+    if (showConsole)
+    {
+        Log::info("==================================================");
+        Log::info("  xwa-arm64 v%s (Xbox Wireless Adapter for Windows ARM64)", XWA_ARM64_VERSION);
+        Log::info("  Derived from xow by Severin v. W. / Medusalix");
+        Log::info("==================================================");
+    }
+
+    // 0. Verify ViGEmBus installation (prompts for one-click install if missing)
+    if (!ViGEmGamepad::ensureDriverInstalled())
+    {
+        return 1;
+    }
 
     // 1. Load configuration
     setGlobalSettings(Settings::load());
