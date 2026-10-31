@@ -158,7 +158,10 @@ int main(int argc, char *argv[])
     }
 
 #if defined(_WIN32)
-    SetConsoleCtrlHandler(consoleCtrlHandler, TRUE);
+    if (showConsole)
+    {
+        SetConsoleCtrlHandler(consoleCtrlHandler, TRUE);
+    }
 #else
     std::signal(SIGINT, signalHandler);
     std::signal(SIGTERM, signalHandler);
