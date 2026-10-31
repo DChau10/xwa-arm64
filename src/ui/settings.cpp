@@ -119,6 +119,21 @@ Settings Settings::load(const std::string &configPath)
         else if (key == "hapticMode") s.hapticMode = static_cast<HapticMode>(std::stoi(val));
         else if (key == "holdDurationMs") s.holdDurationMs = std::stoi(val);
         else if (key == "hold2DurationMs") s.hold2DurationMs = std::stoi(val);
+        else if (key == "customTapVk") s.customTap.vkCode = static_cast<uint8_t>(std::stoi(val));
+        else if (key == "customTapWin") s.customTap.win = (val == "true" || val == "1");
+        else if (key == "customTapCtrl") s.customTap.ctrl = (val == "true" || val == "1");
+        else if (key == "customTapAlt") s.customTap.alt = (val == "true" || val == "1");
+        else if (key == "customTapShift") s.customTap.shift = (val == "true" || val == "1");
+        else if (key == "customHoldVk") s.customHold.vkCode = static_cast<uint8_t>(std::stoi(val));
+        else if (key == "customHoldWin") s.customHold.win = (val == "true" || val == "1");
+        else if (key == "customHoldCtrl") s.customHold.ctrl = (val == "true" || val == "1");
+        else if (key == "customHoldAlt") s.customHold.alt = (val == "true" || val == "1");
+        else if (key == "customHoldShift") s.customHold.shift = (val == "true" || val == "1");
+        else if (key == "customHold2Vk") s.customHold2.vkCode = static_cast<uint8_t>(std::stoi(val));
+        else if (key == "customHold2Win") s.customHold2.win = (val == "true" || val == "1");
+        else if (key == "customHold2Ctrl") s.customHold2.ctrl = (val == "true" || val == "1");
+        else if (key == "customHold2Alt") s.customHold2.alt = (val == "true" || val == "1");
+        else if (key == "customHold2Shift") s.customHold2.shift = (val == "true" || val == "1");
     }
 
     Log::info("Loaded settings from %s (Share: %s, HapticMode: %d)", path.c_str(),
@@ -144,7 +159,22 @@ bool Settings::save(const std::string &configPath) const
          << "  \"hold2Action\": " << static_cast<int>(hold2Action) << ",\n"
          << "  \"hapticMode\": " << static_cast<int>(hapticMode) << ",\n"
          << "  \"holdDurationMs\": " << holdDurationMs << ",\n"
-         << "  \"hold2DurationMs\": " << hold2DurationMs << "\n"
+         << "  \"hold2DurationMs\": " << hold2DurationMs << ",\n"
+         << "  \"customTapVk\": " << (int)customTap.vkCode << ",\n"
+         << "  \"customTapWin\": " << (customTap.win ? "true" : "false") << ",\n"
+         << "  \"customTapCtrl\": " << (customTap.ctrl ? "true" : "false") << ",\n"
+         << "  \"customTapAlt\": " << (customTap.alt ? "true" : "false") << ",\n"
+         << "  \"customTapShift\": " << (customTap.shift ? "true" : "false") << ",\n"
+         << "  \"customHoldVk\": " << (int)customHold.vkCode << ",\n"
+         << "  \"customHoldWin\": " << (customHold.win ? "true" : "false") << ",\n"
+         << "  \"customHoldCtrl\": " << (customHold.ctrl ? "true" : "false") << ",\n"
+         << "  \"customHoldAlt\": " << (customHold.alt ? "true" : "false") << ",\n"
+         << "  \"customHoldShift\": " << (customHold.shift ? "true" : "false") << ",\n"
+         << "  \"customHold2Vk\": " << (int)customHold2.vkCode << ",\n"
+         << "  \"customHold2Win\": " << (customHold2.win ? "true" : "false") << ",\n"
+         << "  \"customHold2Ctrl\": " << (customHold2.ctrl ? "true" : "false") << ",\n"
+         << "  \"customHold2Alt\": " << (customHold2.alt ? "true" : "false") << ",\n"
+         << "  \"customHold2Shift\": " << (customHold2.shift ? "true" : "false") << "\n"
          << "}\n";
 
     Log::info("Saved settings to %s", path.c_str());
