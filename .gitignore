@@ -8,7 +8,6 @@
 
 # Proprietary firmware blobs
 *.bin
-firmware/*.bin
 
 # Build directories
 build/
