@@ -83,6 +83,12 @@ set(SOURCES
     src/gamepad/gamepad.h
     src/gamepad/vigem_gamepad.h
     src/gamepad/vigem_gamepad.cpp
+    src/ui/settings.h
+    src/ui/settings.cpp
+    src/ui/action_dispatcher.h
+    src/ui/action_dispatcher.cpp
+    src/ui/tray.h
+    src/ui/tray.cpp
 )
 
 add_executable(xow-win ${SOURCES})
@@ -97,6 +103,7 @@ target_link_libraries(xow-win PRIVATE
     ViGEmClient
     libusb
     setupapi
+    comctl32
 )
 
 if(MSVC)

@@ -1,4 +1,7 @@
 #include "controller.h"
+#include "../ui/settings.h"
+#include "../ui/action_dispatcher.h"
+#include "../ui/tray.h"
 #include "../gamepad/vigem_gamepad.h"
 #include "../utils/log.h"
 
@@ -39,6 +42,8 @@ Controller::~Controller()
     {
         Log::error("Failed to turn off controller");
     }
+
+    SystemTray::getInstance().updateStatus(true, false, "none");
 }
 
 void Controller::deviceAnnounced(uint8_t id, const AnnounceData *announce)
@@ -81,6 +86,7 @@ void Controller::statusReceived(uint8_t id, const StatusData *status)
     if (level < 4)
     {
         Log::info("Battery level: %s", levels[level].c_str());
+        SystemTray::getInstance().updateStatus(true, true, levels[level]);
     }
 
     batteryLevel = level;
@@ -107,7 +113,7 @@ void Controller::serialNumberReceived(const SerialData *serial)
     Log::info("Controller Serial number: %s", number.c_str());
 }
 
-void Controller::inputReceived(const InputData *input)
+void Controller::inputReceived(const InputData *input, bool sharePressed)
 {
     static bool firstPacketLogged = false;
     if (!firstPacketLogged)
@@ -147,6 +153,48 @@ void Controller::inputReceived(const InputData *input)
     if (gamepad && gamepad->isConnected())
     {
         gamepad->updateState(currentState);
+    }
+
+    // Share button Tap vs. Hold state machine
+    auto now = std::chrono::steady_clock::now();
+    const Settings &settings = getGlobalSettings();
+
+    if (sharePressed && !shareWasPressed)
+    {
+        shareWasPressed = true;
+        shareHoldTriggered = false;
+        sharePressStartTime = now;
+    }
+    else if (sharePressed && shareWasPressed)
+    {
+        if (!shareHoldTriggered)
+        {
+            auto elapsed = std::chrono::duration_cast<std::chrono::milliseconds>(now - sharePressStartTime).count();
+            if (elapsed >= settings.holdDurationMs)
+            {
+                shareHoldTriggered = true;
+                ActionDispatcher::executeHoldAction(settings);
+
+                if (settings.hapticFeedback)
+                {
+                    RumbleData r = {};
+                    r.setLeft = true;
+                    r.setRight = true;
+                    r.left = 35;
+                    r.right = 35;
+                    r.duration = 15;
+                    performRumble(r);
+                }
+            }
+        }
+    }
+    else if (!sharePressed && shareWasPressed)
+    {
+        shareWasPressed = false;
+        if (!shareHoldTriggered)
+        {
+            ActionDispatcher::executeTapAction(settings);
+        }
     }
 }
 
