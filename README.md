@@ -108,3 +108,8 @@ Options:
 * **[ViGEmBus](https://github.com/nefarius/ViGEmBus) & [ViGEmClient](https://github.com/nefarius/ViGEmClient):** Virtual Gamepad Emulation framework created by [Benjamin Höglinger-Stelzer (Nefarius)](https://github.com/nefarius).
 * **[libusb](https://libusb.info/):** Cross-platform library for USB device access.
 * Licensed under the **GNU General Public License v2.0** (matching `xow`). See `LICENSE` for details.
+
+
+### AI Transparency & Development
+
+Portions of this codebase, documentation, and CI/CD automation were developed with the assistance of AI tools (including Google Antigravity / Gemini). All changes—especially low-level WinUSB transfers, cryptographic packet handling, and driver configurations—are manually audited, compiled, and tested on physical Windows on ARM64 hardware by the maintainers.
