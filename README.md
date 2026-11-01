@@ -17,16 +17,13 @@ Microsoft's official kernel driver for the Xbox Wireless Adapter (`mt7612us.sys`
 1. **Standard WinUSB Interface:**
    Binds the adapter to Microsoft's built-in `WinUSB.sys` driver via Windows Device Manager, exposing standard USB bulk and control transfer pipes directly to user mode.
 
-2. **Built-In Setup Assistant:**
-   Detects unconfigured adapters on launch and displays an interactive, stay-on-top guide that walks through Device Manager configuration with real-time status detection.
-
-3. **User-Mode Transceiver Engine:**
+2. **User-Mode Transceiver Engine:**
    Initializes the MediaTek MT7612U hardware, manages 802.11 wireless beacon frames, orchestrates controller pairing, and handles encrypted Game Input Protocol (GIP) packets entirely in user space.
 
-4. **Automated Firmware Delivery:**
+3. **Automated Firmware Delivery:**
    Retrieves official firmware directly from Microsoft's Windows Update CDN, verifies its cryptographic SHA-256 signature, and boots it onto the adapter hardware.
 
-5. **Virtual Gamepad Emulation:**
+4. **Virtual Gamepad Emulation:**
    Feeds controller inputs into the Windows gaming ecosystem via ViGEmBus, providing plug-and-play Xbox 360 controller compatibility and bidirectional rumble across all PC games.
 
 ---
@@ -44,7 +41,7 @@ Microsoft's official kernel driver for the Xbox Wireless Adapter (`mt7612us.sys`
 ## Features
 
 * **System Tray Dashboard:**
-  * Real-time dongle status (`Active`, `Listening`, `WinUSB Driver Required`, `Waiting / Unplugged`).
+  * Real-time dongle status (`Active`, `Listening`, `Waiting / Unplugged`).
   * Connected controller battery status (`full`, `medium`, `low`, `critical`).
   * One-click "Pair New Controller" action.
   * "Start with Windows" autostart toggle.
@@ -52,11 +49,8 @@ Microsoft's official kernel driver for the Xbox Wireless Adapter (`mt7612us.sys`
   * Choose action for Single Tap, Tier 1 Hold (1.0s - 2.0s), and Tier 2 Hold (2.0s - 3.0s).
   * Capture Providers: Steam Recording, Windows Game Bar (`Win+Alt+PrtScn`, `Win+Alt+G`), or Custom Keystrokes.
   * Detent / Ramp Haptic Feedback: Distinct vibration detent notches and ascending ramps indicate hold milestones.
-* **First-Party WinUSB Setup Assistant:**
-  * Modeless floating window stays visible alongside Device Manager with clear instructions.
-  * Real-time polling dynamically detects driver binding and auto-activates.
-* **ViGEmBus Automatic Detection:**
-  * Checks for ViGEmBus on startup. If missing, offers one-click automatic installation with cryptographic hash validation.
+* **Automatic Onboarding:**
+  * Seamlessly verifies prerequisites (ViGEmBus and WinUSB driver binding) on launch.
 
 ---
 
@@ -64,11 +58,9 @@ Microsoft's official kernel driver for the Xbox Wireless Adapter (`mt7612us.sys`
 
 1. Download the latest `xwa-arm64-ARM64.zip` (or `xwa-arm64-x64.zip`) from [Releases](https://github.com/DChau10/xwa-arm64/releases).
 2. Extract the archive and launch `xwa-arm64.exe`.
-3. If ViGEmBus is not yet installed on your system, click **Install ViGEmBus Automatically** on the prompt.
-4. Plug in your Xbox Wireless Adapter:
-   * If Windows has not yet assigned WinUSB to the adapter, the **WinUSB Setup Assistant** will open alongside Device Manager to guide you through the one-time driver selection.
-5. Press the pairing button on your adapter and on your Xbox controller.
-6. Game on!
+3. Plug in your Xbox Wireless Adapter.
+4. Press the pairing button on your adapter and on your Xbox controller.
+5. Game on!
 
 ---
 
