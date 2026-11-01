@@ -18,10 +18,14 @@ public:
     using PairCallback = std::function<void()>;
     using ExitCallback = std::function<void()>;
     using InstallDriverCallback = std::function<void()>;
+    using DeviceChangeCallback = std::function<void(bool arrived)>;
+    using PowerChangeCallback = std::function<void(bool suspend)>;
 
     static SystemTray &getInstance();
 
     bool init(HINSTANCE hInstance, PairCallback onPair, ExitCallback onExit, InstallDriverCallback onInstallDriver = nullptr);
+    void setDeviceChangeCallback(DeviceChangeCallback callback);
+    void setPowerChangeCallback(PowerChangeCallback callback);
     void updateStatus(bool dongleActive, bool controllerConnected, const std::string &batteryLevel);
     void updateDriverState(DriverUiState state);
     void showSettingsDialog();

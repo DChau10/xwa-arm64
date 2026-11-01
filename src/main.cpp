@@ -10,6 +10,8 @@
 #include <iostream>
 #include <atomic>
 #include <csignal>
+#include <mutex>
+#include <condition_variable>
 
 #if defined(_WIN32)
 #define WIN32_LEAN_AND_MEAN
@@ -20,6 +22,10 @@
 
 static std::atomic<bool> g_running{true};
 static Dongle* g_currentDongle = nullptr;
+static std::mutex g_dongleMutex;
+static std::condition_variable g_dongleCv;
+static std::atomic<bool> g_checkRequested{true};
+static std::atomic<bool> g_isSuspended{false};
 
 #if defined(_WIN32)
 static BOOL WINAPI consoleCtrlHandler(DWORD signal)
@@ -28,6 +34,8 @@ static BOOL WINAPI consoleCtrlHandler(DWORD signal)
     {
         Log::info("Shutdown signal received, closing xwa-arm64...");
         g_running = false;
+        g_currentDongle = nullptr;
+        g_dongleCv.notify_all();
         return TRUE;
     }
     return FALSE;
@@ -144,6 +152,8 @@ int main(int argc, char *argv[])
         []() {
             Log::info("Exit requested via System Tray");
             g_running = false;
+            g_currentDongle = nullptr;
+            g_dongleCv.notify_all();
             PostQuitMessage(0);
         },
         []() {
@@ -151,6 +161,40 @@ int main(int argc, char *argv[])
             showWinUsbAssistant(SystemTray::getInstance().getTrayWindow());
         }
     );
+
+    // Register PnP arrival and power management callbacks
+    SystemTray::getInstance().setDeviceChangeCallback([&](bool arrived) {
+        if (arrived)
+        {
+            Log::debug("USB arrival event detected: waking dongle acquisition");
+            g_checkRequested = true;
+            g_dongleCv.notify_all();
+        }
+        else
+        {
+            Log::debug("USB removal event detected: updating dongle state");
+            g_currentDongle = nullptr;
+            g_checkRequested = true;
+            g_dongleCv.notify_all();
+        }
+    });
+
+    SystemTray::getInstance().setPowerChangeCallback([&](bool suspend) {
+        if (suspend)
+        {
+            Log::info("Power management: entering suspend mode, releasing dongle resources");
+            g_isSuspended = true;
+            g_currentDongle = nullptr;
+            g_dongleCv.notify_all();
+        }
+        else
+        {
+            Log::info("Power management: resumed from sleep, queuing adapter check");
+            g_isSuspended = false;
+            g_checkRequested = true;
+            g_dongleCv.notify_all();
+        }
+    });
 
     if (requestSettings)
     {
@@ -182,15 +226,26 @@ int main(int argc, char *argv[])
 
         while (g_running)
         {
+            // If system is suspended (sleep / Modern Standby), wait until resumed
+            if (g_isSuspended)
+            {
+                std::unique_lock<std::mutex> lock(g_dongleMutex);
+                g_dongleCv.wait(lock, [&]() { return !g_isSuspended || !g_running; });
+                if (!g_running) break;
+                // Brief pause after resume to allow USB host controller to power rails
+                std::this_thread::sleep_for(std::chrono::milliseconds(500));
+            }
+
             // 1. Verify driver status via SetupAPI
             AdapterDriverStatus driverStatus = checkAdapterDriverStatus();
             if (driverStatus == AdapterDriverStatus::DRIVER_MISSING)
             {
                 SystemTray::getInstance().updateDriverState(DriverUiState::DriverMissing);
-                for (int i = 0; i < 20 && g_running; ++i)
-                {
-                    std::this_thread::sleep_for(std::chrono::milliseconds(50));
-                }
+                std::unique_lock<std::mutex> lock(g_dongleMutex);
+                g_dongleCv.wait_for(lock, std::chrono::seconds(10), [&]() {
+                    return !g_running || g_isSuspended || g_checkRequested.load();
+                });
+                g_checkRequested = false;
                 continue;
             }
 
@@ -205,17 +260,24 @@ int main(int argc, char *argv[])
                     Log::info("Dongle unplugged / disconnected");
                     SystemTray::getInstance().updateDriverState(DriverUiState::WaitingUnplugged);
                     g_currentDongle = nullptr;
+                    g_checkRequested = true;
+                    g_dongleCv.notify_all();
                 });
 
                 if (!device)
                 {
                     SystemTray::getInstance().updateDriverState(DriverUiState::WaitingUnplugged);
-                    for (int i = 0; i < 10 && g_running; ++i)
-                    {
-                        std::this_thread::sleep_for(std::chrono::milliseconds(50));
-                    }
+                    std::unique_lock<std::mutex> lock(g_dongleMutex);
+                    // Dormant wait: sleeps until Windows fires a USB device arrival or wake event!
+                    // 15-second fallback ensures 0% CPU, no bus polling, and zero Modern Standby disruption.
+                    g_dongleCv.wait_for(lock, std::chrono::seconds(15), [&]() {
+                        return !g_running || g_isSuspended || g_checkRequested.load();
+                    });
+                    g_checkRequested = false;
                     continue;
                 }
+
+                g_checkRequested = false;
 
                 Dongle dongle(std::move(device));
                 g_currentDongle = &dongle;
@@ -230,7 +292,7 @@ int main(int argc, char *argv[])
 
                 Log::info("Dongle is active and listening for controllers.");
 
-                while (g_running && g_currentDongle)
+                while (g_running && g_currentDongle && !g_isSuspended)
                 {
                     std::this_thread::sleep_for(std::chrono::milliseconds(100));
                 }
@@ -241,13 +303,14 @@ int main(int argc, char *argv[])
             {
                 g_currentDongle = nullptr;
                 SystemTray::getInstance().updateDriverState(DriverUiState::WaitingUnplugged);
-                if (g_running)
+                if (g_running && !g_isSuspended)
                 {
                     Log::debug("Dongle notice: %s", ex.what());
-                    for (int i = 0; i < 20 && g_running; ++i)
-                    {
-                        std::this_thread::sleep_for(std::chrono::milliseconds(50));
-                    }
+                    std::unique_lock<std::mutex> lock(g_dongleMutex);
+                    g_dongleCv.wait_for(lock, std::chrono::seconds(5), [&]() {
+                        return !g_running || g_isSuspended || g_checkRequested.load();
+                    });
+                    g_checkRequested = false;
                 }
             }
         }
@@ -277,6 +340,8 @@ int main(int argc, char *argv[])
     }
 
     g_running = false;
+    g_currentDongle = nullptr;
+    g_dongleCv.notify_all();
     if (dongleThread.joinable())
     {
         dongleThread.join();

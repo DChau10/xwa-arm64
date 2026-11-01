@@ -7,6 +7,7 @@
 #include <windows.h>
 #include <shellapi.h>
 #include <commctrl.h>
+#include <dbt.h>
 #include <string>
 #include <sstream>
 
@@ -79,6 +80,10 @@ static NOTIFYICONDATAW g_nid = {};
 static SystemTray::PairCallback g_onPair;
 static SystemTray::ExitCallback g_onExit;
 static SystemTray::InstallDriverCallback g_onInstallDriver;
+static HDEVNOTIFY g_hDevNotify = NULL;
+static HPOWERNOTIFY g_hPowerNotify = NULL;
+static SystemTray::DeviceChangeCallback g_onDeviceChange;
+static SystemTray::PowerChangeCallback g_onPowerChange;
 
 static DriverUiState g_driverUiState = DriverUiState::WaitingUnplugged;
 static bool g_dongleActive = false;
@@ -622,6 +627,38 @@ static LRESULT CALLBACK TrayWndProc(HWND hwnd, UINT msg, WPARAM wParam, LPARAM l
         return 0;
     }
 
+    case WM_DEVICECHANGE:
+    {
+        if (wParam == DBT_DEVICEARRIVAL)
+        {
+            Log::info("USB device arrival detected via Windows PnP");
+            if (g_onDeviceChange) g_onDeviceChange(true);
+        }
+        else if (wParam == DBT_DEVICEREMOVECOMPLETE)
+        {
+            Log::info("USB device removal detected via Windows PnP");
+            if (g_onDeviceChange) g_onDeviceChange(false);
+        }
+        return TRUE;
+    }
+
+    case WM_POWERBROADCAST:
+    {
+        if (wParam == PBT_APMSUSPEND)
+        {
+            Log::info("System entering sleep / Modern Standby (PBT_APMSUSPEND)");
+            if (g_onPowerChange) g_onPowerChange(true);
+            return TRUE;
+        }
+        else if (wParam == PBT_APMRESUMEAUTOMATIC || wParam == PBT_APMRESUMESUSPEND)
+        {
+            Log::info("System resumed from sleep (PBT_APMRESUME)");
+            if (g_onPowerChange) g_onPowerChange(false);
+            return TRUE;
+        }
+        return TRUE;
+    }
+
     case WM_DESTROY:
         PostQuitMessage(0);
         return 0;
@@ -698,7 +735,38 @@ bool SystemTray::init(HINSTANCE hInstance, PairCallback onPair, ExitCallback onE
     wcscpy_s(g_nid.szTip, L"xwa-arm64: Xbox Wireless Adapter (ARM64)");
 
     Shell_NotifyIconW(NIM_ADD, &g_nid);
+
+    // 1. Register for USB device Plug-and-Play notifications (arrival and removal)
+    DEV_BROADCAST_DEVICEINTERFACE_W devFilter = {};
+    devFilter.dbcc_size = sizeof(devFilter);
+    devFilter.dbcc_devicetype = DBT_DEVTYP_DEVICEINTERFACE;
+    static const GUID guidUsbDevice = { 0xA5DCBF10, 0x6530, 0x11D2, { 0x90, 0x1F, 0x00, 0xC0, 0x4F, 0xB9, 0x51, 0xED } };
+    devFilter.dbcc_classguid = guidUsbDevice;
+
+    g_hDevNotify = RegisterDeviceNotificationW(g_hTrayWnd, &devFilter, DEVICE_NOTIFY_WINDOW_HANDLE);
+    if (!g_hDevNotify)
+    {
+        Log::debug("Notice: RegisterDeviceNotificationW returned NULL (Error: %lu)", GetLastError());
+    }
+
+    // 2. Register for Modern Standby / Sleep suspend and resume notifications
+    g_hPowerNotify = RegisterSuspendResumeNotification(g_hTrayWnd, DEVICE_NOTIFY_WINDOW_HANDLE);
+    if (!g_hPowerNotify)
+    {
+        Log::debug("Notice: RegisterSuspendResumeNotification returned NULL (Error: %lu)", GetLastError());
+    }
+
     return true;
+}
+
+void SystemTray::setDeviceChangeCallback(DeviceChangeCallback callback)
+{
+    g_onDeviceChange = std::move(callback);
+}
+
+void SystemTray::setPowerChangeCallback(PowerChangeCallback callback)
+{
+    g_onPowerChange = std::move(callback);
 }
 
 void SystemTray::updateDriverState(DriverUiState state)
@@ -795,6 +863,18 @@ void SystemTray::processMessages()
 
 void SystemTray::shutdown()
 {
+    if (g_hDevNotify)
+    {
+        UnregisterDeviceNotification(g_hDevNotify);
+        g_hDevNotify = NULL;
+    }
+
+    if (g_hPowerNotify)
+    {
+        UnregisterSuspendResumeNotification(g_hPowerNotify);
+        g_hPowerNotify = NULL;
+    }
+
     if (g_hSettingsWnd)
     {
         DestroyWindow(g_hSettingsWnd);
