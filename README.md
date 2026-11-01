@@ -24,7 +24,7 @@ Microsoft's official kernel driver for the Xbox Wireless Adapter (`mt7612us.sys`
    Retrieves official firmware directly from Microsoft's Windows Update CDN, verifies its cryptographic SHA-256 signature, and boots it onto the adapter hardware.
 
 4. **Virtual Gamepad Emulation:**
-   Feeds controller inputs into the Windows gaming ecosystem via ViGEmBus, providing plug-and-play Xbox 360 controller compatibility and bidirectional rumble across all PC games.
+   Feeds controller inputs into the Windows gaming ecosystem via [ViGEmBus](https://github.com/nefarius/ViGEmBus), providing plug-and-play Xbox 360 controller compatibility and bidirectional rumble across all PC games.
 
 ---
 
@@ -50,7 +50,7 @@ Microsoft's official kernel driver for the Xbox Wireless Adapter (`mt7612us.sys`
   * Capture Providers: Steam Recording, Windows Game Bar (`Win+Alt+PrtScn`, `Win+Alt+G`), or Custom Keystrokes.
   * Detent / Ramp Haptic Feedback: Distinct vibration detent notches and ascending ramps indicate hold milestones.
 * **Automatic Onboarding:**
-  * Seamlessly verifies prerequisites (ViGEmBus and WinUSB driver binding) on launch.
+  * Seamlessly verifies prerequisites ([ViGEmBus](https://github.com/nefarius/ViGEmBus) and WinUSB driver binding) on launch.
 
 ---
 
@@ -103,24 +103,9 @@ Options:
 
 ---
 
-## Architecture: ViGEmBus vs. Microsoft Synthetic Device
-
-Users often ask why `xwa-arm64` uses ViGEmBus rather than Microsoft's internal `xboxgipsynthetic.dll` (`SWD\XBOXGIP_SYNTHETIC`):
-
-* **ViGEmBus (Default):**
-  * **Ease of Use:** Runs under standard user permissions without special system flags.
-  * **Compatibility:** 100% compatible with all PC games, emulators, and launchers (Steam, Xbox Game Pass, Epic).
-  * **Limitation:** Emulates an Xbox 360 layout (does not expose separate Impulse Trigger motors or 3.5mm headset audio).
-* **Microsoft Synthetic Device:**
-  * Requires **Windows Developer Mode** to be turned on in Windows Settings and requires running as Administrator on every launch (otherwise blocked by Windows security with `E_ACCESSDENIED` `0x80080005`).
-  * Relies on undocumented, private Microsoft APIs that can break between Windows feature updates.
-
-`xwa-arm64` abstracts the virtual gamepad layer behind the `IVirtualGamepad` interface, allowing alternative backends to be selected in the future.
-
----
-
 ## Credits & License
 
-* **xow:** Originally created by [Severin von Wnuck (Medusalix)](https://github.com/medusalix/xow) for Linux.
-* **ViGEmBus:** Virtual Gamepad Emulation framework created by [Benjamin Höglinger-Stelzer (Nefarius)](https://github.com/nefarius/ViGEmBus).
+* **[xow](https://github.com/medusalix/xow):** Originally created by [Severin von Wnuck (Medusalix)](https://github.com/medusalix) for Linux.
+* **[ViGEmBus](https://github.com/nefarius/ViGEmBus) & [ViGEmClient](https://github.com/nefarius/ViGEmClient):** Virtual Gamepad Emulation framework created by [Benjamin Höglinger-Stelzer (Nefarius)](https://github.com/nefarius).
+* **[libusb](https://libusb.info/):** Cross-platform library for USB device access.
 * Licensed under the **GNU General Public License v2.0** (matching `xow`). See `LICENSE` for details.
