@@ -2,7 +2,7 @@
 
 **xwa-arm64** is an open-source, user-mode Windows driver and background service for the official **Microsoft Xbox Wireless USB Adapter** (both the Model 1713 original bulky adapter and Model 1790 slim adapter).
 
-It enables the Xbox Wireless Adapter to work seamlessly on **Windows on ARM64** (including Snapdragon X Elite, Snapdragon X Plus, Surface Pro, and Copilot+ PCs) as well as standard **x64/x86 Windows** using native Windows APIs and Microsoft's in-box WinUSB driver.
+It enables the Xbox Wireless Adapter to work seamlessly on **Windows on ARM64** (including Snapdragon X Elite, Snapdragon X Plus, Surface Pro, and Copilot+ PCs) using native Windows APIs and Microsoft's in-box WinUSB driver.
 
 Derived from the Linux driver [`xow`](https://github.com/medusalix/xow) by Severin von Wnuck (Medusalix).
 
@@ -56,7 +56,7 @@ Microsoft's official kernel driver for the Xbox Wireless Adapter (`mt7612us.sys`
 
 ## Quick Start
 
-1. Download the latest `xwa-arm64-ARM64.zip` (or `xwa-arm64-x64.zip`) from [Releases](https://github.com/DChau10/xwa-arm64/releases).
+1. Download the latest `xwa-arm64-ARM64.zip` from [Releases](https://github.com/DChau10/xwa-arm64/releases).
 2. Extract the archive and launch `xwa-arm64.exe`.
 3. Plug in your Xbox Wireless Adapter.
 4. Press the pairing button on your adapter and on your Xbox controller.
@@ -77,9 +77,8 @@ Microsoft's official kernel driver for the Xbox Wireless Adapter (`mt7612us.sys`
 git clone https://github.com/DChau10/xwa-arm64.git
 cd xwa-arm64
 
-# Generate CMake build files for ARM64 (or x64)
+# Generate CMake build files for ARM64
 cmake -B build -A ARM64 -DCMAKE_BUILD_TYPE=Release
-# or: cmake -B build -A x64 -DCMAKE_BUILD_TYPE=Release
 
 # Compile release binary
 cmake --build build --config Release
