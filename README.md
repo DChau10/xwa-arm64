@@ -30,11 +30,16 @@ Microsoft's official kernel driver for the Xbox Wireless Adapter (`mt7612us.sys`
 
 ## Supported Hardware
 
-| Hardware | USB ID | Description |
-| :--- | :--- | :--- |
-| **Model 1790** | `045E:02FE` / `045E:02E6` | Xbox Wireless Adapter for Windows (Slim version, MT7612U) |
-| **Model 1713** | `045E:02D1` | Xbox Wireless Adapter for Windows (Original bulky version) |
-| **Surface Transceiver** | `045E:091E` | Built-in Xbox Wireless module on Microsoft Surface devices |
+All official Xbox Wireless Adapters utilize the MediaTek MT7612U SoC and official Microsoft firmware (`FW_ACC_00U.bin`).
+
+| Hardware | USB ID | Chipset | Status |
+| :--- | :--- | :--- | :--- |
+| **Model 1790 (Slim Adapter)** | `045E:02FE` | MediaTek MT7612U | **Verified & Working** (Tested on Windows on ARM64) |
+| **Model 1713 (Original Bulky)** | `045E:02E6` | MediaTek MT7612U | Implemented (Architecture-compatible, testing needed) |
+| **Surface Transceiver** | `045E:091E` | MediaTek MT7612U | Implemented (Architecture-compatible, testing needed) |
+
+> [!NOTE]
+> Testing is currently confirmed on the Model 1790 (Slim revision). If you have access to a Model 1713 or a Surface with built-in Xbox Wireless and would like to help test on Windows on ARM, please open an issue or share your experience!
 
 ---
 

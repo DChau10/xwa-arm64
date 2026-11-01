@@ -198,9 +198,8 @@ int main(int argc, char *argv[])
             try
             {
                 std::unique_ptr<UsbDevice> device = manager.tryGetDevice({
-                    { DONGLE_VID, DONGLE_PID_OLD },
-                    { DONGLE_VID, DONGLE_PID_NEW },
-                    { DONGLE_VID, DONGLE_PID_ORIGINAL },
+                    { DONGLE_VID, DONGLE_PID_SLIM },
+                    { DONGLE_VID, DONGLE_PID_BULKY },
                     { DONGLE_VID, DONGLE_PID_SURFACE }
                 }, [&]() {
                     Log::info("Dongle unplugged / disconnected");

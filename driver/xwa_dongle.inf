@@ -16,21 +16,18 @@ PnpLockdown = 1
 %ManufacturerName% = Standard,NTarm64,NTamd64,NTx86
 
 [Standard.NTarm64]
-%DeviceDesc_02E6% = USB_Install, USB\VID_045E&PID_02E6
 %DeviceDesc_02FE% = USB_Install, USB\VID_045E&PID_02FE
-%DeviceDesc_02D1% = USB_Install, USB\VID_045E&PID_02D1
+%DeviceDesc_02E6% = USB_Install, USB\VID_045E&PID_02E6
 %DeviceDesc_091E% = USB_Install, USB\VID_045E&PID_091E
 
 [Standard.NTamd64]
-%DeviceDesc_02E6% = USB_Install, USB\VID_045E&PID_02E6
 %DeviceDesc_02FE% = USB_Install, USB\VID_045E&PID_02FE
-%DeviceDesc_02D1% = USB_Install, USB\VID_045E&PID_02D1
+%DeviceDesc_02E6% = USB_Install, USB\VID_045E&PID_02E6
 %DeviceDesc_091E% = USB_Install, USB\VID_045E&PID_091E
 
 [Standard.NTx86]
-%DeviceDesc_02E6% = USB_Install, USB\VID_045E&PID_02E6
 %DeviceDesc_02FE% = USB_Install, USB\VID_045E&PID_02FE
-%DeviceDesc_02D1% = USB_Install, USB\VID_045E&PID_02D1
+%DeviceDesc_02E6% = USB_Install, USB\VID_045E&PID_02E6
 %DeviceDesc_091E% = USB_Install, USB\VID_045E&PID_091E
 
 ; ================= Class section =====================
@@ -61,7 +58,6 @@ HKR,,DeviceInterfaceGUIDs,0x10000,"{A5DCBF10-6530-11D2-901F-00C04FB951ED}"
 ProviderName       = "xow-win Project"
 ManufacturerName   = "Microsoft (WinUSB Wrapper)"
 ClassName          = "Universal Serial Bus devices"
-DeviceDesc_02E6    = "Xbox Wireless Adapter for Windows (WinUSB)"
-DeviceDesc_02FE    = "Xbox Wireless Adapter (WinUSB)"
-DeviceDesc_02D1    = "Xbox Wireless Adapter Model 1713 (WinUSB)"
+DeviceDesc_02FE    = "Xbox Wireless Adapter Model 1790 (WinUSB)"
+DeviceDesc_02E6    = "Xbox Wireless Adapter Model 1713 (WinUSB)"
 DeviceDesc_091E    = "Surface Wireless Transceiver (WinUSB)"

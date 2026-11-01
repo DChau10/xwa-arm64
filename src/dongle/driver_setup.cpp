@@ -44,10 +44,9 @@ AdapterDriverStatus checkAdapterDriverStatus(std::wstring *outDesc, std::wstring
         {
             for (const wchar_t *p = hwId; *p; p += wcslen(p) + 1)
             {
-                // Match official dongle PIDs: 02FE (Slim), 02E6 (Bulky), 02D1, 091E (Surface)
+                // Match official dongle PIDs: 02FE (Slim), 02E6 (Bulky), 091E (Surface)
                 if (wcsstr(p, L"VID_045E&PID_02FE") || wcsstr(p, L"vid_045e&pid_02fe") ||
                     wcsstr(p, L"VID_045E&PID_02E6") || wcsstr(p, L"vid_045e&pid_02e6") ||
-                    wcsstr(p, L"VID_045E&PID_02D1") || wcsstr(p, L"vid_045e&pid_02d1") ||
                     wcsstr(p, L"VID_045E&PID_091E") || wcsstr(p, L"vid_045e&pid_091e"))
                 {
                     if (outHardwareId) *outHardwareId = p;
