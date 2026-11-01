@@ -2,7 +2,7 @@
 
 **xwa-arm64** is an open-source, user-mode Windows driver and background service for the official **Microsoft Xbox Wireless USB Adapter** (both the Model 1713 original bulky adapter and Model 1790 slim adapter).
 
-It enables the Xbox Wireless Adapter to work seamlessly on **Windows on ARM64** (including Snapdragon X Elite, Snapdragon X Plus, Surface Pro, and Copilot+ PCs) as well as **x64/x86 Windows**, without requiring Microsoft's missing ARM64 kernel drivers, without installing third-party driver-swapping utilities, and without disabling Driver Signature Enforcement or Core Isolation.
+It enables the Xbox Wireless Adapter to work seamlessly on **Windows on ARM64** (including Snapdragon X Elite, Snapdragon X Plus, Surface Pro, and Copilot+ PCs) as well as standard **x64/x86 Windows** using native Windows APIs and Microsoft's in-box WinUSB driver.
 
 Derived from the Linux driver [`xow`](https://github.com/medusalix/xow) by Severin von Wnuck (Medusalix).
 
@@ -10,26 +10,24 @@ Derived from the Linux driver [`xow`](https://github.com/medusalix/xow) by Sever
 
 ## Why xwa-arm64?
 
-Microsoft never released an ARM64-compatible version of `mt7612us.sys` (the MediaTek MT7612U NDIS miniport driver that powers the USB dongle). While Windows 11 on ARM natively emulates x86/x64 desktop user applications, **the Windows NT kernel strictly rejects non-native kernel drivers**. As a result, plugging the adapter into a Windows on ARM PC results in Device Manager showing a missing driver error (`XBOX ACC` with Code 28).
+Microsoft's official kernel driver for the Xbox Wireless Adapter (`mt7612us.sys`) was only built for x86/x64 architectures. Because the Windows NT kernel strictly requires native ARM64 drivers, plugging the adapter into a Windows on ARM PC leaves it without a functional driver (`XBOX ACC` with Code 28).
 
-Third-party driver tools (like Zadig) frequently fail on Windows 11 ARM64 due to 32-bit x86 emulation restrictions and kernel Memory Integrity / Core Isolation checks.
+### How It Works
 
-### How xwa-arm64 Solves This
+1. **Standard WinUSB Interface:**
+   Binds the adapter to Microsoft's built-in `WinUSB.sys` driver via Windows Device Manager, exposing standard USB bulk and control transfer pipes directly to user mode.
 
-1. **100% Native, In-Box Microsoft WinUSB Driver:**
-   Binds the adapter to Microsoft's WHQL-signed in-box generic USB driver (**`WinUSB.sys`**) using native Windows Device Manager. No third-party driver utilities or unsigned packages needed.
+2. **Built-In Setup Assistant:**
+   Detects unconfigured adapters on launch and displays an interactive, stay-on-top guide that walks through Device Manager configuration with real-time status detection.
 
-2. **Built-In Modeless WinUSB Setup Assistant:**
-   If `xwa-arm64` detects that the adapter needs the WinUSB driver, it opens a floating, stay-on-top Setup Assistant window side-by-side with Device Manager. It guides you through the quick 7-step process with live `SetupAPI` polling that automatically detects when configuration is complete.
+3. **User-Mode Transceiver Engine:**
+   Initializes the MediaTek MT7612U hardware, manages 802.11 wireless beacon frames, orchestrates controller pairing, and handles encrypted Game Input Protocol (GIP) packets entirely in user space.
 
-3. **User-Space Transceiver & Controller Engine:**
-   Communicates directly with the MediaTek wireless chip over WinUSB, verifies firmware integrity, broadcasts Xbox Wireless 802.11 beacon frames, manages encryption, and handles controller pairing.
+4. **Automated Firmware Delivery:**
+   Retrieves official firmware directly from Microsoft's Windows Update CDN, verifies its cryptographic SHA-256 signature, and boots it onto the adapter hardware.
 
-4. **Zero-Configuration Firmware Security:**
-   Firmware (`FW_ACC_00U.bin`) is never bundled in the repository or releases (respecting copyright). Instead, `xwa-arm64` fetches it on-demand from Microsoft's official Windows Update CDN (`download.windowsupdate.com`) and cryptographically validates its SHA-256 checksum before uploading to hardware.
-
-5. **Virtual Gamepad Integration (ViGEmBus):**
-   Translates wireless controller inputs into virtual Xbox 360 gamepads using **ViGEmBus**, with bidirectional force feedback (rumble) support across all PC games and emulators.
+5. **Virtual Gamepad Emulation:**
+   Feeds controller inputs into the Windows gaming ecosystem via ViGEmBus, providing plug-and-play Xbox 360 controller compatibility and bidirectional rumble across all PC games.
 
 ---
 
