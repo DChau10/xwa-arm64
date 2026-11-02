@@ -62,12 +62,29 @@ jobs:
         with:
           name: xwa-arm64-ARM64
 
-      - name: Create GitHub Release
-        uses: softprops/action-gh-release@v2
-        with:
-          files: |
-            xwa-arm64-ARM64.zip
-            xwa-arm64-ARM64.zip.sha256
-          generate_release_notes: true
-          draft: false
-          prerelease: ${{ contains(github.ref, '-') }}
+      - name: Publish GitHub Release
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          TAG: ${{ github.ref_name }}
+          REPO: ${{ github.repository }}
+        run: |
+          PRERELEASE_FLAG=""
+          if [[ "$TAG" == *"-"* ]]; then
+            PRERELEASE_FLAG="--prerelease"
+          fi
+
+          # If the release was already created as a draft in the web UI:
+          if gh release view "$TAG" --repo "$REPO" >/dev/null 2>&1; then
+            echo "Release draft exists for $TAG. Uploading assets..."
+            gh release upload "$TAG" xwa-arm64-ARM64.zip xwa-arm64-ARM64.zip.sha256 --repo "$REPO" --clobber
+            gh release edit "$TAG" --repo "$REPO" --draft=false $PRERELEASE_FLAG
+          else
+            echo "Creating new release for $TAG..."
+            # Create as draft with assets attached first, then publish (required for Immutable Releases)
+            gh release create "$TAG" xwa-arm64-ARM64.zip xwa-arm64-ARM64.zip.sha256 \
+              --repo "$REPO" \
+              --draft \
+              --generate-notes \
+              $PRERELEASE_FLAG
+            gh release edit "$TAG" --repo "$REPO" --draft=false
+          fi
