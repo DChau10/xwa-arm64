@@ -21,13 +21,10 @@ UsbDevice::UsbDevice(
         throw UsbException("Error opening device", error);
     }
 
-    // On Windows/WinUSB, resetting or setting configuration may return NOT_SUPPORTED or BUSY;
-    // we log but do not fail if already configured.
-    error = libusb_reset_device(handle);
-    if (error && error != LIBUSB_ERROR_NOT_SUPPORTED)
-    {
-        Log::debug("Reset device warning: %s", libusb_error_name(error));
-    }
+    // Note: We do NOT call libusb_reset_device here.
+    // Under Windows WinUSB, resetting the device attempts to reset pipes and cycles the hub port.
+    // If the device is in the middle of being disconnected or contact bouncing, port reset fails
+    // at the host controller level, prompting Windows to report "Unknown USB Device (Port Reset Failed)".
 
     error = libusb_set_configuration(handle, 1);
     if (error && error != LIBUSB_ERROR_NOT_SUPPORTED && error != LIBUSB_ERROR_BUSY)
@@ -44,6 +41,7 @@ UsbDevice::UsbDevice(
 
 UsbDevice::~UsbDevice()
 {
+    disconnected = true;
     if (handle)
     {
         libusb_release_interface(handle, 0);
@@ -54,6 +52,11 @@ UsbDevice::~UsbDevice()
 
 void UsbDevice::controlTransfer(ControlPacket packet, bool write)
 {
+    if (disconnected)
+    {
+        return;
+    }
+
     uint8_t type = LIBUSB_REQUEST_TYPE_VENDOR;
     type |= write ? LIBUSB_ENDPOINT_OUT : LIBUSB_ENDPOINT_IN;
 
@@ -70,6 +73,14 @@ void UsbDevice::controlTransfer(ControlPacket packet, bool write)
 
     if (transferred < 0)
     {
+        if (transferred == LIBUSB_ERROR_NO_DEVICE || transferred == LIBUSB_ERROR_IO)
+        {
+            disconnected = true;
+            if (terminate)
+            {
+                terminate();
+            }
+        }
         throw UsbException("Error performing control transfer", transferred);
     }
 }
@@ -78,6 +89,11 @@ int UsbDevice::bulkRead(
     uint8_t endpoint,
     FixedBytes<USB_MAX_BULK_TRANSFER_SIZE> &buffer
 ) {
+    if (disconnected)
+    {
+        return -1;
+    }
+
     int transferred = 0;
 
     int error = libusb_bulk_transfer(
@@ -98,6 +114,7 @@ int UsbDevice::bulkRead(
     // Device was unplugged / reset
     if (error == LIBUSB_ERROR_NO_DEVICE || error == LIBUSB_ERROR_IO)
     {
+        disconnected = true;
         Log::info("USB Device disconnected");
         if (terminate)
         {
@@ -117,6 +134,11 @@ int UsbDevice::bulkRead(
 
 bool UsbDevice::bulkWrite(uint8_t endpoint, Bytes &data)
 {
+    if (disconnected)
+    {
+        return false;
+    }
+
     int transferred = 0;
 
     int error = libusb_bulk_transfer(
@@ -127,6 +149,16 @@ bool UsbDevice::bulkWrite(uint8_t endpoint, Bytes &data)
         &transferred,
         USB_TIMEOUT_WRITE
     );
+
+    if (error == LIBUSB_ERROR_NO_DEVICE || error == LIBUSB_ERROR_IO)
+    {
+        disconnected = true;
+        if (terminate)
+        {
+            terminate();
+        }
+        return false;
+    }
 
     if (error)
     {

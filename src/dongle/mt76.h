@@ -539,6 +539,7 @@ protected:
 
     /* MCU functions/commands */
     bool setPairingStatus(bool enable);
+    bool isConnected() const { return usbDevice && !usbDevice->isDisconnected(); }
 
     Bytes macAddress;
     std::unique_ptr<UsbDevice> usbDevice;

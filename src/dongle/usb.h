@@ -7,6 +7,7 @@
 #include <memory>
 #include <string>
 #include <stdexcept>
+#include <atomic>
 
 #if defined(__has_include)
     #if __has_include(<libusb-1.0/libusb.h>)
@@ -47,10 +48,13 @@ public:
         FixedBytes<USB_MAX_BULK_TRANSFER_SIZE> &buffer
     );
     bool bulkWrite(uint8_t endpoint, Bytes &data);
+    bool isDisconnected() const { return disconnected.load(); }
+    void markDisconnected() { disconnected = true; }
 
 private:
     libusb_device_handle *handle = nullptr;
     Terminate terminate;
+    std::atomic<bool> disconnected{false};
 };
 
 /*

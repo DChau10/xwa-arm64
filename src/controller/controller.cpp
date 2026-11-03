@@ -50,9 +50,13 @@ Controller::~Controller()
         gamepad->disconnect();
     }
 
-    if (!setPowerMode(DEVICE_ID_CONTROLLER, POWER_OFF))
+    try
     {
-        Log::error("Failed to turn off controller");
+        setPowerMode(DEVICE_ID_CONTROLLER, POWER_OFF);
+    }
+    catch (...)
+    {
+        // Suppress errors during teardown if USB connection was severed
     }
 
     SystemTray::getInstance().updateStatus(true, false, "none");

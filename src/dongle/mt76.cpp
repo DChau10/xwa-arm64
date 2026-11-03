@@ -872,14 +872,24 @@ Mt76::Mt76(
 
 Mt76::~Mt76()
 {
-    if (!setLedMode(MT_LED_OFF))
+    if (isConnected())
     {
-        Log::error("Failed to turn off LED");
-    }
+        try
+        {
+            if (!setLedMode(MT_LED_OFF))
+            {
+                Log::debug("Notice: unable to turn off LED during shutdown");
+            }
 
-    if (!powerMode(RADIO_OFF))
-    {
-        Log::error("Failed to turn off radio");
+            if (!powerMode(RADIO_OFF))
+            {
+                Log::debug("Notice: unable to turn off radio during shutdown");
+            }
+        }
+        catch (...)
+        {
+            // Do not let exceptions escape destructor
+        }
     }
 }
 
@@ -1163,6 +1173,11 @@ bool Mt76::setPairingStatus(bool enable)
 
 bool Mt76::sendWlanPacket(const Bytes &data)
 {
+    if (!isConnected())
+    {
+        return false;
+    }
+
     // Values must be 32-bit aligned
     // 32 zero-bits mark the end
     uint32_t length = data.size();
@@ -2043,6 +2058,11 @@ bool Mt76::setLedMode(uint32_t index)
 
 bool Mt76::sendCommand(McuCommand command, const Bytes &data)
 {
+    if (!isConnected())
+    {
+        return false;
+    }
+
     std::lock_guard<std::mutex> lock(txMutex);
 
     // Values must be 32-bit aligned

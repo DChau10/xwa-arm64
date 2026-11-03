@@ -248,6 +248,18 @@ int main(int argc, char *argv[])
                 g_checkRequested = false;
                 continue;
             }
+            else if (driverStatus == AdapterDriverStatus::NOT_PRESENT)
+            {
+                SystemTray::getInstance().updateDriverState(DriverUiState::WaitingUnplugged);
+                SystemTray::getInstance().updateStatus(false, false, "none");
+                std::unique_lock<std::mutex> lock(g_dongleMutex);
+                // Dormant wait: sleeps until Windows fires a USB device arrival or wake event!
+                g_dongleCv.wait_for(lock, std::chrono::seconds(15), [&]() {
+                    return !g_running || g_isSuspended || g_checkRequested.load();
+                });
+                g_checkRequested = false;
+                continue;
+            }
 
             // 2. Attempt to acquire USB device
             try
@@ -298,6 +310,13 @@ int main(int argc, char *argv[])
                 }
 
                 g_currentDongle = nullptr;
+                SystemTray::getInstance().updateDriverState(DriverUiState::WaitingUnplugged);
+                SystemTray::getInstance().updateStatus(false, false, "none");
+
+                // Debounce delay after disconnect: allows physical pin contact bounce
+                // and Windows USB hub port reset/teardown to settle completely.
+                std::this_thread::sleep_for(std::chrono::milliseconds(500));
+                g_checkRequested = false;
             }
             catch (const std::exception &ex)
             {
