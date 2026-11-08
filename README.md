@@ -80,7 +80,19 @@ All official Xbox Wireless Adapters utilize the MediaTek MT7612U SoC and officia
 
 ---
 
-### Option A: Developer Command Prompt (Recommended — Zero Extra Installs)
+### Option A: 1-Click Build Script (Recommended)
+
+Simply open any standard Command Prompt or PowerShell in the repository root and run:
+
+```cmd
+build.bat
+```
+
+The script automatically locates your Visual Studio or Build Tools installation, initializes the native ARM64 MSVC environment (`vcvarsall.bat arm64`), configures CMake with Ninja, and compiles `bin\xwa-arm64.exe`.
+
+---
+
+### Option B: Developer Command Prompt (Zero Extra Installs)
 
 1. Open the Windows Start menu and launch **Developer Command Prompt for VS 2022** (or **ARM64 Native Tools Command Prompt for VS 2022**).
 2. Clone and build:
@@ -97,7 +109,7 @@ All official Xbox Wireless Adapters utilize the MediaTek MT7612U SoC and officia
 
 ---
 
-### Option B: Standard PowerShell / Terminal (Using System CMake)
+### Option C: Standard Terminal (Visual Studio Generator)
 
 If you prefer using standard PowerShell or Windows Terminal, install CMake system-wide via `winget`:
 
@@ -117,7 +129,7 @@ cmake --build build --config Release
 
 ---
 
-### Option C: Visual Studio GUI (No Command Line)
+### Option D: Visual Studio GUI (No Command Line)
 
 Visual Studio 2022 has native CMake integration:
 1. Open **Visual Studio 2022**.
