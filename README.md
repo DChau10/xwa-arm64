@@ -71,25 +71,63 @@ All official Xbox Wireless Adapters utilize the MediaTek MT7612U SoC and officia
 
 ## Building from Source
 
-### Requirements
-* [Visual Studio 2022](https://visualstudio.microsoft.com/) with C++ Desktop Development tools (or standalone MSVC Build Tools).
-* [CMake 3.16+](https://cmake.org/).
-* Git.
+### Prerequisites
+* **[Visual Studio 2022](https://visualstudio.microsoft.com/)** (Community, Professional, or standalone MSVC Build Tools) with the **Desktop development with C++** workload.
+* **Git**.
 
-### Build Steps
+> [!NOTE]
+> Visual Studio includes `cmake`, `ninja`, and the MSVC ARM64 toolchain, but does not expose them in your global system `PATH` by default. Use one of the options below to build.
 
+---
+
+### Option A: Developer Command Prompt (Recommended — Zero Extra Installs)
+
+1. Open the Windows Start menu and launch **Developer Command Prompt for VS 2022** (or **ARM64 Native Tools Command Prompt for VS 2022**).
+2. Clone and build:
+   ```cmd
+   git clone https://github.com/DChau10/xwa-arm64.git
+   cd xwa-arm64
+
+   # Configure build for ARM64 Release using Ninja
+   cmake -B build -G Ninja -DCMAKE_BUILD_TYPE=Release
+
+   # Compile executable
+   cmake --build build --config Release
+   ```
+
+---
+
+### Option B: Standard PowerShell / Terminal (Using System CMake)
+
+If you prefer using standard PowerShell or Windows Terminal, install CMake system-wide via `winget`:
+
+```powershell
+winget install Kitware.CMake
+```
+*(Restart your terminal window after installation so `cmake` is added to your `PATH`)*
+
+Then build with the MSVC ARM64 generator:
 ```cmd
 git clone https://github.com/DChau10/xwa-arm64.git
 cd xwa-arm64
 
-# Generate CMake build files for ARM64
 cmake -B build -A ARM64 -DCMAKE_BUILD_TYPE=Release
-
-# Compile release binary
 cmake --build build --config Release
 ```
 
-The compiled binary will be located at `bin\xwa-arm64.exe`.
+---
+
+### Option C: Visual Studio GUI (No Command Line)
+
+Visual Studio 2022 has native CMake integration:
+1. Open **Visual Studio 2022**.
+2. Select **File > Open > Folder...** and choose the cloned repository folder.
+3. In the top toolbar configuration dropdown, select **`ARM64-Release`** (or edit CMake settings to target ARM64).
+4. Click **Build > Build All** (or press `F7`).
+
+---
+
+The compiled executable will be located at `bin\xwa-arm64.exe`.
 
 ---
 
