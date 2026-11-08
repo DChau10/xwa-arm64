@@ -10,6 +10,7 @@
 #include <dbt.h>
 #include <string>
 #include <sstream>
+#include <mutex>
 
 #pragma comment(lib, "comctl32.lib")
 
@@ -91,6 +92,10 @@ static bool g_controllerConnected = false;
 static std::string g_batteryLevel = "unknown";
 
 static HFONT g_hFont = NULL;
+// Guards the tray state globals (g_driverUiState, g_dongleActive, g_controllerConnected,
+// g_batteryLevel) which are written by the dongle/USB worker threads and read by the
+// UI thread in WM_TRAYICON.
+static std::mutex g_trayStateMutex;
 
 #define IDC_BTN_CUSTOM_KEYS 2010
 
@@ -549,28 +554,34 @@ static LRESULT CALLBACK TrayWndProc(HWND hwnd, UINT msg, WPARAM wParam, LPARAM l
             HMENU hMenu = CreatePopupMenu();
             AppendMenuW(hMenu, MF_STRING | MF_DISABLED, IDM_HEADER, L"xwa-arm64 v1.0.0 (ARM64)");
 
-            std::wstring statusStr = L"Dongle: Active";
-            if (g_driverUiState == DriverUiState::DriverMissing)
+            std::wstring statusStr;
+            DriverUiState driverState;
             {
-                statusStr = L"Dongle: WinUSB Driver Required";
-            }
-            else if (g_controllerConnected)
-            {
-                std::wstring bStr(g_batteryLevel.begin(), g_batteryLevel.end());
-                statusStr = L"Controller: Connected (Battery: " + bStr + L")";
-            }
-            else if (!g_dongleActive)
-            {
-                statusStr = L"Dongle: Waiting / Unplugged";
-            }
-            else
-            {
-                statusStr = L"Dongle: Active (Listening)";
+                std::lock_guard<std::mutex> lock(g_trayStateMutex);
+                driverState = g_driverUiState;
+                statusStr = L"Dongle: Active";
+                if (driverState == DriverUiState::DriverMissing)
+                {
+                    statusStr = L"Dongle: WinUSB Driver Required";
+                }
+                else if (g_controllerConnected)
+                {
+                    std::wstring bStr(g_batteryLevel.begin(), g_batteryLevel.end());
+                    statusStr = L"Controller: Connected (Battery: " + bStr + L")";
+                }
+                else if (!g_dongleActive)
+                {
+                    statusStr = L"Dongle: Waiting / Unplugged";
+                }
+                else
+                {
+                    statusStr = L"Dongle: Active (Listening)";
+                }
             }
 
             AppendMenuW(hMenu, MF_STRING | MF_DISABLED, IDM_STATUS, statusStr.c_str());
 
-            if (g_driverUiState == DriverUiState::DriverMissing)
+            if (driverState == DriverUiState::DriverMissing)
             {
                 AppendMenuW(hMenu, MF_STRING, IDM_INSTALL_DRIVER, L"⚡ Configure WinUSB in Device Manager...");
             }
@@ -771,6 +782,7 @@ void SystemTray::setPowerChangeCallback(PowerChangeCallback callback)
 
 void SystemTray::updateDriverState(DriverUiState state)
 {
+    std::lock_guard<std::mutex> lock(g_trayStateMutex);
     g_driverUiState = state;
     std::wstring tip = L"xwa-arm64: Xbox Wireless Adapter (ARM64)";
     if (state == DriverUiState::DriverMissing)
@@ -801,6 +813,7 @@ HWND SystemTray::getTrayWindow() const
 
 void SystemTray::updateStatus(bool dongleActive, bool controllerConnected, const std::string &batteryLevel)
 {
+    std::lock_guard<std::mutex> lock(g_trayStateMutex);
     g_dongleActive = dongleActive;
     g_controllerConnected = controllerConnected;
     g_batteryLevel = batteryLevel;
