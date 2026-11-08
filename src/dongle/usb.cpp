@@ -126,6 +126,15 @@ int UsbDevice::bulkRead(
     if (error)
     {
         Log::error("Bulk read error: %s", libusb_error_name(error));
+        // Any non-timeout error (stalled pipe, busy, etc.) means the session is
+        // unrecoverable in place. Tear down and let the main loop re-acquire the
+        // dongle rather than silently dying with a dead reader thread. This matches
+        // upstream xow, which terminates on any bulk error.
+        disconnected = true;
+        if (terminate)
+        {
+            terminate();
+        }
         return -1;
     }
 
