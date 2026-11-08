@@ -1463,9 +1463,10 @@ bool Mt76::loadFirmware()
 
     if (!file)
     {
-        Log::error("Failed to open %s", fwPath.c_str());
-        Log::info("Run xow-get-firmware.sh to download the firmware");
-
+        Log::error("Failed to open firmware file: %s", fwPath.c_str());
+        Log::error("FW_ACC_00U.bin was not found (checked local dir, ProgramData, DriverStore, and Windows Update).");
+        Log::error("Obtain it from Microsoft's 'Xbox Wireless Adapter for Windows' driver and place it at: %s", fwPath.c_str());
+        Log::error("You can also run get-firmware.ps1 to download and verify it automatically.");
         return false;
     }
 

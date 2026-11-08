@@ -129,19 +129,19 @@ inline std::string get_firmware_path()
         cmd = "powershell.exe -NoProfile -ExecutionPolicy Bypass -File \"" + scriptPath + "\" -DestinationDir \"" + pdPath + "\"";
     } else {
         cmd = "powershell.exe -NoProfile -ExecutionPolicy Bypass -Command \""
-              "$u='http://download.windowsupdate.com/c/msdownload/update/driver/drvs/2017/07/1cd6a87c-623f-4407-a52d-c31be49e925c_e19f60808bdcbfbd3c3df6be3e71ffc52e43261e.cab';"
-              "$c=\\\"$env:TEMP\\fw.cab\\\";"
-              "$e=\\\"$env:TEMP\\fwe\\\";"
-              "Invoke-WebRequest -Uri $u -OutFile $c -UseBasicParsing;"
-              "New-Item -ItemType Directory -Path $e -Force | Out-Null;"
-              "& expand.exe $c -F:FW_ACC_00U.bin $e | Out-Null;"
-              "$h=(Get-FileHash -Path \\\"$e\\FW_ACC_00U.bin\\\" -Algorithm SHA256).Hash;"
-              "if ($h -eq '48084D9FA53B9BB04358F3BB127B7495DC8F7BB0B3CA1437BD24EF2B6EABDF66') {"
-              "  Copy-Item \\\"$e\\FW_ACC_00U.bin\\\" -Destination \\\"" + targetFw + "\\\" -Force;"
-              "  Remove-Item $c -Force -ErrorAction SilentlyContinue;"
-              "  Remove-Item $e -Recurse -Force -ErrorAction SilentlyContinue;"
-              "  exit 0;"
-              "} else { exit 1; }\"";
+              "[Net.ServicePointManager]::SecurityProtocol=[Net.SecurityProtocolType]::Tls12;"
+              "$trusted=@('48084D9FA53B9BB04358F3BB127B7495DC8F7BB0B3CA1437BD24EF2B6EABDF66','080CE4091E53A4EF3E5FE29939F51FD91F46D6A88BE6D67EB6E99A5723B3A223');"
+              "try {"
+              "  $c=Join-Path $env:TEMP 'fw.cab'; $e=Join-Path $env:TEMP 'fwe';"
+              "  Invoke-WebRequest -Uri 'http://download.windowsupdate.com/c/msdownload/update/driver/drvs/2017/07/1cd6a87c-623f-4407-a52d-c31be49e925c_e19f60808bdcbfbd3c3df6be3e71ffc52e43261e.cab' -OutFile $c -UseBasicParsing -TimeoutSec 90;"
+              "  New-Item -ItemType Directory -Path $e -Force | Out-Null;"
+              "  & expand.exe $c -F:FW_ACC_00U.bin $e | Out-Null;"
+              "  $f=Join-Path $e 'FW_ACC_00U.bin';"
+              "  $h=(Get-FileHash -Path $f -Algorithm SHA256).Hash;"
+              "  if ($trusted -contains $h) { Copy-Item $f -Destination '" + targetFw + "' -Force; exit 0; }"
+              "  Remove-Item $c -Force -ErrorAction SilentlyContinue; Remove-Item $e -Recurse -Force -ErrorAction SilentlyContinue;"
+              "} catch {};"
+              "exit 1;\"";
     }
 
     STARTUPINFOA si = { sizeof(si) };
@@ -153,7 +153,7 @@ inline std::string get_firmware_path()
     cmdBuf.push_back('\0');
 
     if (CreateProcessA(NULL, cmdBuf.data(), NULL, NULL, FALSE, CREATE_NO_WINDOW, NULL, NULL, &si, &pi)) {
-        WaitForSingleObject(pi.hProcess, 30000);
+        WaitForSingleObject(pi.hProcess, 120000);
         DWORD exitCode = 1;
         GetExitCodeProcess(pi.hProcess, &exitCode);
         CloseHandle(pi.hProcess);
@@ -165,7 +165,7 @@ inline std::string get_firmware_path()
     }
 
     // Default fallback
-    return "FW_ACC_00U.bin";
+    return targetFw;
 #else
     return "/lib/firmware/xow_dongle.bin";
 #endif
