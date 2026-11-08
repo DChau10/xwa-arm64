@@ -11,6 +11,7 @@
 
 # Build directories
 build/
+build-*/
 bin/
 out/
 .vs/
