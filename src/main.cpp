@@ -21,7 +21,8 @@
 #define XWA_ARM64_VERSION "1.0.0"
 
 static std::atomic<bool> g_running{true};
-static Dongle* g_currentDongle = nullptr;
+static std::atomic<Dongle*> g_currentDongle{nullptr};
+static std::atomic<bool> g_pairRequested{false};
 static std::mutex g_dongleMutex;
 static std::condition_variable g_dongleCv;
 static std::atomic<bool> g_checkRequested{true};
@@ -34,7 +35,7 @@ static BOOL WINAPI consoleCtrlHandler(DWORD signal)
     {
         Log::info("Shutdown signal received, closing xwa-arm64...");
         g_running = false;
-        g_currentDongle = nullptr;
+        g_currentDongle.store(nullptr);
         g_dongleCv.notify_all();
         return TRUE;
     }
@@ -139,10 +140,12 @@ int main(int argc, char *argv[])
     SystemTray::getInstance().init(
         GetModuleHandle(NULL),
         []() {
-            if (g_currentDongle)
+            // UI thread: never touch the Dongle directly (its lifetime is owned by the
+            // worker thread). Just flag it; the worker performs the pairing beacon write.
+            if (g_currentDongle.load())
             {
-                Log::info("Pairing mode initiated via System Tray");
-                g_currentDongle->setPairingStatus(true);
+                Log::info("Pairing mode requested via System Tray");
+                g_pairRequested = true;
             }
             else
             {
@@ -152,7 +155,7 @@ int main(int argc, char *argv[])
         []() {
             Log::info("Exit requested via System Tray");
             g_running = false;
-            g_currentDongle = nullptr;
+            g_currentDongle.store(nullptr);
             g_dongleCv.notify_all();
             PostQuitMessage(0);
         },
@@ -172,8 +175,12 @@ int main(int argc, char *argv[])
         }
         else
         {
-            Log::debug("USB removal event detected: updating dongle state");
-            g_currentDongle = nullptr;
+            // A PnP removal event fires for ANY USB device (mice, keyboards, phones),
+            // not just the dongle. We must NOT tear the dongle session down here, or
+            // unplugging a mouse would kill the wireless link. The USB bulk layer
+            // already detects the real dongle loss and calls terminate() itself.
+            // We only wake the acquisition loop so it can re-verify quickly.
+            Log::debug("USB removal event detected: requesting re-check (not tearing down session)");
             g_checkRequested = true;
             g_dongleCv.notify_all();
         }
@@ -184,7 +191,7 @@ int main(int argc, char *argv[])
         {
             Log::info("Power management: entering suspend mode, releasing dongle resources");
             g_isSuspended = true;
-            g_currentDongle = nullptr;
+            g_currentDongle.store(nullptr);
             g_dongleCv.notify_all();
         }
         else
@@ -271,7 +278,7 @@ int main(int argc, char *argv[])
                 }, [&]() {
                     Log::info("Dongle unplugged / disconnected");
                     SystemTray::getInstance().updateDriverState(DriverUiState::WaitingUnplugged);
-                    g_currentDongle = nullptr;
+                    g_currentDongle.store(nullptr);
                     g_checkRequested = true;
                     g_dongleCv.notify_all();
                 });
@@ -292,24 +299,33 @@ int main(int argc, char *argv[])
                 g_checkRequested = false;
 
                 Dongle dongle(std::move(device));
-                g_currentDongle = &dongle;
+                g_currentDongle.store(&dongle);
 
                 SystemTray::getInstance().updateDriverState(DriverUiState::Active);
                 SystemTray::getInstance().updateStatus(true, false, "none");
 
-                // Automatically enable pairing / reconnection window on startup (PR #176)
+                // Automatically enable pairing / reconnection window on acquire
                 Log::info("Enabling automatic controller connection window...");
                 dongle.setPairingStatus(true);
                 requestPair = false;
+                g_pairRequested = false;
 
                 Log::info("Dongle is active and listening for controllers.");
 
-                while (g_running && g_currentDongle && !g_isSuspended)
+                // Idle while the dongle is alive. The reader threads (spawned by the Dongle)
+                // handle all input; this loop also services tray Pair requests on the thread
+                // that owns the Dongle, avoiding any cross-thread use-after-free.
+                while (g_running && g_currentDongle.load() && !g_isSuspended)
                 {
+                    if (g_pairRequested.exchange(false))
+                    {
+                        Log::info("Performing pairing beacon write (worker thread)");
+                        dongle.setPairingStatus(true);
+                    }
                     std::this_thread::sleep_for(std::chrono::milliseconds(100));
                 }
 
-                g_currentDongle = nullptr;
+                g_currentDongle.store(nullptr);
                 SystemTray::getInstance().updateDriverState(DriverUiState::WaitingUnplugged);
                 SystemTray::getInstance().updateStatus(false, false, "none");
 
@@ -320,7 +336,7 @@ int main(int argc, char *argv[])
             }
             catch (const std::exception &ex)
             {
-                g_currentDongle = nullptr;
+                g_currentDongle.store(nullptr);
                 SystemTray::getInstance().updateDriverState(DriverUiState::WaitingUnplugged);
                 if (g_running && !g_isSuspended)
                 {
@@ -359,7 +375,7 @@ int main(int argc, char *argv[])
     }
 
     g_running = false;
-    g_currentDongle = nullptr;
+    g_currentDongle.store(nullptr);
     g_dongleCv.notify_all();
     if (dongleThread.joinable())
     {
