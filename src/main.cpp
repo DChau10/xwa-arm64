@@ -3,13 +3,16 @@
 #include "dongle/usb.h"
 #include "dongle/dongle.h"
 #include "dongle/driver_setup.h"
-#include "ui/settings.h"
+#include "ui/settings_dialog.h"
+#include "ui/imgui_renderer.h"
 #include "ui/tray.h"
+#include "ui/settings.h"
 #include "gamepad/vigem_gamepad.h"
 
 #include <iostream>
 #include <atomic>
 #include <csignal>
+#include <memory>
 #include <mutex>
 #include <condition_variable>
 
@@ -27,6 +30,9 @@ static std::mutex g_dongleMutex;
 static std::condition_variable g_dongleCv;
 static std::atomic<bool> g_checkRequested{true};
 static std::atomic<bool> g_isSuspended{false};
+
+// On-demand Dear ImGui settings window managed on the main Win32 UI thread
+static std::unique_ptr<SettingsDialog> g_settingsDialog;
 
 #if defined(_WIN32)
 static BOOL WINAPI consoleCtrlHandler(DWORD signal)
@@ -127,6 +133,9 @@ int main(int argc, char *argv[])
         Log::info("==================================================");
     }
 
+    // Enable Per-Monitor V2 DPI awareness for sharp UI rendering
+    ImGuiRenderer::enableProcessDpiAwareness();
+
     // 0. Verify ViGEmBus installation (prompts for one-click install if missing)
     if (!ViGEmGamepad::ensureDriverInstalled())
     {
@@ -165,6 +174,53 @@ int main(int argc, char *argv[])
         }
     );
 
+    // Register Settings callback (modeless ImGui dialog with fallback to legacy Win32)
+    SystemTray::getInstance().setSettingsCallback([]() {
+        if (g_settingsDialog && g_settingsDialog->isOpen())
+        {
+            g_settingsDialog->focus();
+            return;
+        }
+
+        if (!g_settingsDialog)
+        {
+            g_settingsDialog = std::make_unique<SettingsDialog>();
+        }
+
+        SettingsDialog::Callbacks cb;
+        cb.onSave = [](const Settings &updated, bool autoStart) {
+            updated.save();
+            setGlobalSettings(updated);
+            setAutoStartEnabled(autoStart);
+            Log::info("Settings saved and applied.");
+        };
+        cb.onPair = []() {
+            if (g_currentDongle.load())
+            {
+                Log::info("Pairing mode requested via Settings window");
+                g_pairRequested = true;
+            }
+            else
+            {
+                Log::info("Dongle not connected, cannot pair");
+            }
+        };
+        cb.onWinUsbGuide = []() {
+            showWinUsbAssistant(SystemTray::getInstance().getTrayWindow());
+        };
+        cb.getStatus = []() {
+            return SystemTray::getInstance().getStatusSnapshot();
+        };
+
+        Log::info("Settings requested - opening ImGui settings window");
+        if (!g_settingsDialog->open(getGlobalSettings(), isAutoStartEnabled(), std::move(cb)))
+        {
+            Log::error("ImGui settings dialog failed; falling back to legacy dialog");
+            g_settingsDialog.reset();
+            SystemTray::getInstance().showLegacySettingsDialog();
+        }
+    });
+
     // Register PnP arrival and power management callbacks
     SystemTray::getInstance().setDeviceChangeCallback([&](bool arrived) {
         if (arrived)
@@ -202,11 +258,6 @@ int main(int argc, char *argv[])
             g_dongleCv.notify_all();
         }
     });
-
-    if (requestSettings)
-    {
-        SystemTray::getInstance().showSettingsDialog();
-    }
 
 #if defined(_WIN32)
     if (showConsole)
@@ -351,6 +402,11 @@ int main(int argc, char *argv[])
         }
     });
 
+    if (requestSettings)
+    {
+        SystemTray::getInstance().showSettingsDialog();
+    }
+
     // Main thread owns the Win32 message loop - UI is ALWAYS responsive!
     MSG msg;
     while (g_running)
@@ -371,7 +427,24 @@ int main(int argc, char *argv[])
             break;
         }
 
-        MsgWaitForMultipleObjects(0, NULL, FALSE, 50, QS_ALLINPUT);
+        if (g_settingsDialog && g_settingsDialog->isOpen())
+        {
+            g_settingsDialog->tick();
+            if (!g_settingsDialog->isOpen())
+            {
+                g_settingsDialog.reset();
+            }
+        }
+        else
+        {
+            MsgWaitForMultipleObjects(0, NULL, FALSE, 100, QS_ALLINPUT);
+        }
+    }
+
+    if (g_settingsDialog)
+    {
+        g_settingsDialog->close();
+        g_settingsDialog.reset();
     }
 
     g_running = false;

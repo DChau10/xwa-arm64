@@ -16,6 +16,16 @@ set(CMAKE_RUNTIME_OUTPUT_DIRECTORY_DEBUG "${CMAKE_CURRENT_SOURCE_DIR}/bin")
 
 include(FetchContent)
 
+# 0. Fetch Dear ImGui (single-header UI library with Win32+DX11 backend)
+message(STATUS "Configuring Dear ImGui...")
+FetchContent_Declare(
+    imgui
+    GIT_REPOSITORY https://github.com/ocornut/imgui.git
+    GIT_TAG        v1.91.9-docking
+    GIT_SHALLOW    TRUE
+)
+FetchContent_MakeAvailable(imgui)
+
 # 1. Fetch ViGEmClient
 message(STATUS "Configuring ViGEmClient...")
 FetchContent_Declare(
@@ -85,12 +95,22 @@ set(SOURCES
     src/gamepad/gamepad.h
     src/gamepad/vigem_gamepad.h
     src/gamepad/vigem_gamepad.cpp
-    src/ui/settings.h
-    src/ui/settings.cpp
+    src/ui/settings_dialog.h
+    src/ui/settings_dialog.cpp
+    src/ui/imgui_renderer.h
+    src/ui/imgui_renderer.cpp
     src/ui/action_dispatcher.h
     src/ui/action_dispatcher.cpp
+    src/ui/settings.h
+    src/ui/settings.cpp
     src/ui/tray.h
     src/ui/tray.cpp
+    ${imgui_SOURCE_DIR}/imgui.cpp
+    ${imgui_SOURCE_DIR}/imgui_draw.cpp
+    ${imgui_SOURCE_DIR}/imgui_tables.cpp
+    ${imgui_SOURCE_DIR}/imgui_widgets.cpp
+    ${imgui_SOURCE_DIR}/backends/imgui_impl_win32.cpp
+    ${imgui_SOURCE_DIR}/backends/imgui_impl_dx11.cpp
     res/xwa-arm64.rc
 )
 
@@ -100,6 +120,7 @@ target_include_directories(xwa-arm64 PRIVATE
     src
     ${vigemclient_SOURCE_DIR}/include
     ${libusb_SOURCE_DIR}/libusb
+    ${imgui_SOURCE_DIR}
 )
 
 target_link_libraries(xwa-arm64 PRIVATE
@@ -108,6 +129,9 @@ target_link_libraries(xwa-arm64 PRIVATE
     setupapi
     comctl32
     bcrypt
+    d3d11
+    dxgi
+    dwmapi
 )
 
 set_target_properties(xwa-arm64 PROPERTIES WIN32_EXECUTABLE TRUE)

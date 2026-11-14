@@ -36,6 +36,41 @@
         outHex = hexBuf;
         return true;
     }
+
+    // RAII guard for temporarily switching the calling thread's Win32 DPI awareness
+    // context (e.g. -5 = UNAWARE_GDISCALED for fixed-pixel GDI dialogs).
+    class ScopedThreadDpiContext
+    {
+    public:
+        explicit ScopedThreadDpiContext(intptr_t targetContext)
+        {
+            HMODULE user32 = GetModuleHandleW(L"user32.dll");
+            if (user32)
+            {
+                using Fn = HANDLE(WINAPI *)(HANDLE);
+                m_setFn = reinterpret_cast<Fn>(GetProcAddress(user32, "SetThreadDpiAwarenessContext"));
+                if (m_setFn)
+                {
+                    m_prev = m_setFn(reinterpret_cast<HANDLE>(targetContext));
+                }
+            }
+        }
+
+        ~ScopedThreadDpiContext()
+        {
+            if (m_setFn && m_prev)
+            {
+                m_setFn(m_prev);
+            }
+        }
+
+        ScopedThreadDpiContext(const ScopedThreadDpiContext &) = delete;
+        ScopedThreadDpiContext &operator=(const ScopedThreadDpiContext &) = delete;
+
+    private:
+        HANDLE(WINAPI *m_setFn)(HANDLE) = nullptr;
+        HANDLE m_prev = nullptr;
+    };
 #endif
 
 #if defined(_MSC_VER)

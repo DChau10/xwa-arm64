@@ -1,6 +1,7 @@
 #pragma once
 
 #include <string>
+#include <vector>
 #include <cstdint>
 
 enum class CaptureProvider : int
@@ -68,6 +69,17 @@ struct Settings
     static Settings load(const std::string &path = "");
     bool save(const std::string &path = "") const;
 };
+
+struct SelectableKey
+{
+    const char *name;
+    const wchar_t *wname;
+    uint8_t vk;
+};
+
+const std::vector<SelectableKey> &getSelectableKeys();
+int findSelectableKeyIndex(uint8_t vk);
+std::string formatKeyBinding(const KeyBinding &kb);
 
 // Global settings instance accessible across threads
 Settings &getGlobalSettings();

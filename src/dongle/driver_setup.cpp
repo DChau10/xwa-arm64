@@ -266,6 +266,8 @@ void showWinUsbAssistant(HWND hParent)
         return;
     }
 
+    ScopedThreadDpiContext gdiDpiGuard(-5); // DPI_AWARENESS_CONTEXT_UNAWARE_GDISCALED
+
     HINSTANCE hInst = GetModuleHandleW(NULL);
 
     static bool s_classRegistered = false;

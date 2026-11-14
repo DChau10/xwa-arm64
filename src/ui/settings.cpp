@@ -7,6 +7,7 @@
 #include <fstream>
 #include <sstream>
 #include <mutex>
+#include <cstdio>
 
 static Settings g_settings;
 static std::mutex g_settingsMutex;
@@ -208,4 +209,76 @@ bool Settings::save(const std::string &configPath) const
     DeleteFileA(tmpPath.c_str());
     Log::error("Failed to save settings (replace failed): %s", path.c_str());
     return false;
+}
+
+const std::vector<SelectableKey> &getSelectableKeys()
+{
+    static const std::vector<SelectableKey> keys = {
+        { "F1", L"F1", 0x70 }, { "F2", L"F2", 0x71 }, { "F3", L"F3", 0x72 }, { "F4", L"F4", 0x73 },
+        { "F5", L"F5", 0x74 }, { "F6", L"F6", 0x75 }, { "F7", L"F7", 0x76 }, { "F8", L"F8", 0x77 },
+        { "F9", L"F9", 0x78 }, { "F10", L"F10", 0x79 }, { "F11", L"F11", 0x7A }, { "F12", L"F12", 0x7B },
+        { "Print Screen", L"Print Screen", 0x2C }, { "Scroll Lock", L"Scroll Lock", 0x91 },
+        { "Pause / Break", L"Pause / Break", 0x13 },
+        { "Space", L"Space", 0x20 }, { "Enter", L"Enter", 0x0D }, { "Tab", L"Tab", 0x09 },
+        { "Escape", L"Escape", 0x1B }, { "Backspace", L"Backspace", 0x08 },
+        { "Delete", L"Delete", 0x2E }, { "Insert", L"Insert", 0x2D },
+        { "Home", L"Home", 0x24 }, { "End", L"End", 0x23 },
+        { "Page Up", L"Page Up", 0x21 }, { "Page Down", L"Page Down", 0x22 },
+        { "A", L"A", 0x41 }, { "B", L"B", 0x42 }, { "C", L"C", 0x43 }, { "D", L"D", 0x44 },
+        { "E", L"E", 0x45 }, { "F", L"F", 0x46 }, { "G", L"G", 0x47 }, { "H", L"H", 0x48 },
+        { "I", L"I", 0x49 }, { "J", L"J", 0x4A }, { "K", L"K", 0x4B }, { "L", L"L", 0x4C },
+        { "M", L"M", 0x4D }, { "N", L"N", 0x4E }, { "O", L"O", 0x4F }, { "P", L"P", 0x50 },
+        { "Q", L"Q", 0x51 }, { "R", L"R", 0x52 }, { "S", L"S", 0x53 }, { "T", L"T", 0x54 },
+        { "U", L"U", 0x55 }, { "V", L"V", 0x56 }, { "W", L"W", 0x57 }, { "X", L"X", 0x58 },
+        { "Y", L"Y", 0x59 }, { "Z", L"Z", 0x5A },
+        { "0", L"0", 0x30 }, { "1", L"1", 0x31 }, { "2", L"2", 0x32 }, { "3", L"3", 0x33 },
+        { "4", L"4", 0x34 }, { "5", L"5", 0x35 }, { "6", L"6", 0x36 }, { "7", L"7", 0x37 },
+        { "8", L"8", 0x38 }, { "9", L"9", 0x39 },
+        { "Mute Audio", L"Mute Audio", 0xAD }, { "Volume Down", L"Volume Down", 0xAE },
+        { "Volume Up", L"Volume Up", 0xAF }, { "Play / Pause", L"Play / Pause", 0xB3 },
+        { "Next Track", L"Next Track", 0xB0 }, { "Prev Track", L"Prev Track", 0xB1 }
+    };
+    return keys;
+}
+
+int findSelectableKeyIndex(uint8_t vk)
+{
+    const auto &keys = getSelectableKeys();
+    for (int i = 0; i < static_cast<int>(keys.size()); ++i)
+    {
+        if (keys[i].vk == vk) return i;
+    }
+    return -1;
+}
+
+std::string formatKeyBinding(const KeyBinding &kb)
+{
+    std::string out;
+    auto appendPart = [&](const char *part) {
+        if (!out.empty()) out += " + ";
+        out += part;
+    };
+
+    if (kb.win) appendPart("Win");
+    if (kb.ctrl) appendPart("Ctrl");
+    if (kb.alt) appendPart("Alt");
+    if (kb.shift) appendPart("Shift");
+
+    int idx = findSelectableKeyIndex(kb.vkCode);
+    if (idx >= 0)
+    {
+        appendPart(getSelectableKeys()[idx].name);
+    }
+    else if (kb.vkCode != 0)
+    {
+        char buf[16];
+        std::snprintf(buf, sizeof(buf), "0x%02X", kb.vkCode);
+        appendPart(buf);
+    }
+    else
+    {
+        appendPart("None");
+    }
+
+    return out;
 }

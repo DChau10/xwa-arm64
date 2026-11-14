@@ -333,6 +333,7 @@ void Controller::deviceAnnounced(uint8_t id, const AnnounceData *announce)
 
     initialized = true;
     initInput(announce);
+    SystemTray::getInstance().updateStatus(true, true, "none");
 }
 
 void Controller::statusReceived(uint8_t id, const StatusData *status)
@@ -342,7 +343,18 @@ void Controller::statusReceived(uint8_t id, const StatusData *status)
     uint8_t type = status->batteryType;
     uint8_t level = status->batteryLevel;
 
-    if (type == BATT_TYPE_CHARGING || level == batteryLevel)
+    if (type == BATT_TYPE_CHARGING)
+    {
+        if (batteryLevel != 0xfe)
+        {
+            Log::info("Battery status: charging");
+            SystemTray::getInstance().updateStatus(true, true, "charging");
+            batteryLevel = 0xfe;
+        }
+        return;
+    }
+
+    if (level == batteryLevel)
     {
         return;
     }

@@ -1,5 +1,6 @@
 #include "tray.h"
 #include "settings.h"
+#include "../compat.h"
 #include "../utils/log.h"
 #include "../../res/resource.h"
 
@@ -33,7 +34,7 @@
 #define IDC_BTN_SAVE 2007
 #define IDC_BTN_CANCEL 2008
 
-static bool isAutoStartEnabled()
+bool isAutoStartEnabled()
 {
     HKEY hKey;
     if (RegOpenKeyExW(HKEY_CURRENT_USER, L"Software\\Microsoft\\Windows\\CurrentVersion\\Run", 0, KEY_READ, &hKey) != ERROR_SUCCESS)
@@ -48,7 +49,7 @@ static bool isAutoStartEnabled()
     return (res == ERROR_SUCCESS);
 }
 
-static bool setAutoStartEnabled(bool enable)
+bool setAutoStartEnabled(bool enable)
 {
     HKEY hKey;
     if (RegOpenKeyExW(HKEY_CURRENT_USER, L"Software\\Microsoft\\Windows\\CurrentVersion\\Run", 0, KEY_SET_VALUE, &hKey) != ERROR_SUCCESS)
@@ -81,6 +82,7 @@ static NOTIFYICONDATAW g_nid = {};
 static SystemTray::PairCallback g_onPair;
 static SystemTray::ExitCallback g_onExit;
 static SystemTray::InstallDriverCallback g_onInstallDriver;
+static SystemTray::SettingsCallback g_onSettings;
 static HDEVNOTIFY g_hDevNotify = NULL;
 static HPOWERNOTIFY g_hPowerNotify = NULL;
 static SystemTray::DeviceChangeCallback g_onDeviceChange;
@@ -99,43 +101,9 @@ static std::mutex g_trayStateMutex;
 
 #define IDC_BTN_CUSTOM_KEYS 2010
 
-struct KeyItem {
-    const wchar_t *name;
-    uint8_t vk;
-};
-
-static const KeyItem g_keyItems[] = {
-    { L"F1", 0x70 }, { L"F2", 0x71 }, { L"F3", 0x72 }, { L"F4", 0x73 },
-    { L"F5", 0x74 }, { L"F6", 0x75 }, { L"F7", 0x76 }, { L"F8", 0x77 },
-    { L"F9", 0x78 }, { L"F10", 0x79 }, { L"F11", 0x7A }, { L"F12", 0x7B },
-    { L"Print Screen", 0x2C }, { L"Scroll Lock", 0x91 }, { L"Pause / Break", 0x13 },
-    { L"Space", 0x20 }, { L"Enter", 0x0D }, { L"Tab", 0x09 }, { L"Escape", 0x1B },
-    { L"Backspace", 0x08 }, { L"Delete", 0x2E }, { L"Insert", 0x2D },
-    { L"Home", 0x24 }, { L"End", 0x23 }, { L"Page Up", 0x21 }, { L"Page Down", 0x22 },
-    { L"A", 0x41 }, { L"B", 0x42 }, { L"C", 0x43 }, { L"D", 0x44 }, { L"E", 0x45 },
-    { L"F", 0x46 }, { L"G", 0x47 }, { L"H", 0x48 }, { L"I", 0x49 }, { L"J", 0x4A },
-    { L"K", 0x4B }, { L"L", 0x4C }, { L"M", 0x4D }, { L"N", 0x4E }, { L"O", 0x4F },
-    { L"P", 0x50 }, { L"Q", 0x51 }, { L"R", 0x52 }, { L"S", 0x53 }, { L"T", 0x54 },
-    { L"U", 0x55 }, { L"V", 0x56 }, { L"W", 0x57 }, { L"X", 0x58 }, { L"Y", 0x59 }, { L"Z", 0x5A },
-    { L"0", 0x30 }, { L"1", 0x31 }, { L"2", 0x32 }, { L"3", 0x33 }, { L"4", 0x34 },
-    { L"5", 0x35 }, { L"6", 0x36 }, { L"7", 0x37 }, { L"8", 0x38 }, { L"9", 0x39 },
-    { L"Mute Audio", 0xAD }, { L"Volume Down", 0xAE }, { L"Volume Up", 0xAF },
-    { L"Play / Pause", 0xB3 }, { L"Next Track", 0xB0 }, { L"Prev Track", 0xB1 }
-};
-
 static KeyBinding g_tempCustomTap;
 static KeyBinding g_tempCustomHold;
 static KeyBinding g_tempCustomHold2;
-
-static int getIndexForVk(uint8_t vk)
-{
-    int count = sizeof(g_keyItems) / sizeof(g_keyItems[0]);
-    for (int i = 0; i < count; ++i)
-    {
-        if (g_keyItems[i].vk == vk) return i;
-    }
-    return 11; // Default to F12
-}
 
 // Custom Keystrokes Sub-Dialog
 #define IDC_CK_TAP_WIN   3001
@@ -175,12 +143,13 @@ static LRESULT CALLBACK CustomKeysWndProc(HWND hwnd, UINT msg, WPARAM wParam, LP
 
         auto populateCombo = [&](HWND hCmb, uint8_t curVk) {
             SendMessageW(hCmb, WM_SETFONT, (WPARAM)g_hFont, TRUE);
-            int count = sizeof(g_keyItems) / sizeof(g_keyItems[0]);
-            for (int i = 0; i < count; ++i)
+            const auto &keys = getSelectableKeys();
+            for (const auto &k : keys)
             {
-                SendMessageW(hCmb, CB_ADDSTRING, 0, (LPARAM)g_keyItems[i].name);
+                SendMessageW(hCmb, CB_ADDSTRING, 0, (LPARAM)k.wname);
             }
-            SendMessageW(hCmb, CB_SETCURSEL, getIndexForVk(curVk), 0);
+            int sel = findSelectableKeyIndex(curVk);
+            SendMessageW(hCmb, CB_SETCURSEL, sel >= 0 ? sel : 11, 0);
         };
 
         // Section 1: Single Tap
@@ -273,9 +242,10 @@ static LRESULT CALLBACK CustomKeysWndProc(HWND hwnd, UINT msg, WPARAM wParam, LP
         if (id == IDC_BTN_CK_OK)
         {
             auto readComboVk = [&](int cmbId) -> uint8_t {
+                const auto &keys = getSelectableKeys();
                 int sel = static_cast<int>(SendMessageW(GetDlgItem(hwnd, cmbId), CB_GETCURSEL, 0, 0));
-                if (sel >= 0 && sel < (int)(sizeof(g_keyItems)/sizeof(g_keyItems[0])))
-                    return g_keyItems[sel].vk;
+                if (sel >= 0 && sel < static_cast<int>(keys.size()))
+                    return keys[sel].vk;
                 return 0x7B; // F12
             };
 
@@ -327,6 +297,8 @@ static void showCustomKeysDialog(HWND hParent)
         SetForegroundWindow(g_hCustomKeysWnd);
         return;
     }
+
+    ScopedThreadDpiContext gdiDpiGuard(-5); // UNAWARE_GDISCALED for fixed-pixel GDI controls
 
     int width = 500;
     int height = 320;
@@ -556,9 +528,11 @@ static LRESULT CALLBACK TrayWndProc(HWND hwnd, UINT msg, WPARAM wParam, LPARAM l
 
             std::wstring statusStr;
             DriverUiState driverState;
+            bool dongleActive = false;
             {
                 std::lock_guard<std::mutex> lock(g_trayStateMutex);
                 driverState = g_driverUiState;
+                dongleActive = g_dongleActive;
                 statusStr = L"Dongle: Active";
                 if (driverState == DriverUiState::DriverMissing)
                 {
@@ -569,7 +543,7 @@ static LRESULT CALLBACK TrayWndProc(HWND hwnd, UINT msg, WPARAM wParam, LPARAM l
                     std::wstring bStr(g_batteryLevel.begin(), g_batteryLevel.end());
                     statusStr = L"Controller: Connected (Battery: " + bStr + L")";
                 }
-                else if (!g_dongleActive)
+                else if (!dongleActive)
                 {
                     statusStr = L"Dongle: Waiting / Unplugged";
                 }
@@ -593,7 +567,7 @@ static LRESULT CALLBACK TrayWndProc(HWND hwnd, UINT msg, WPARAM wParam, LPARAM l
             AppendMenuW(hMenu, MF_SEPARATOR, 0, NULL);
             AppendMenuW(hMenu, MF_STRING, IDM_SETTINGS, L"Settings...");
 
-            UINT pairFlags = (g_dongleActive ? MF_STRING : (MF_STRING | MF_GRAYED | MF_DISABLED));
+            UINT pairFlags = (dongleActive ? MF_STRING : (MF_STRING | MF_GRAYED | MF_DISABLED));
             AppendMenuW(hMenu, pairFlags, IDM_PAIR, L"Pair New Controller");
 
             UINT autoStartFlags = MF_STRING | (isAutoStartEnabled() ? MF_CHECKED : MF_UNCHECKED);
@@ -684,11 +658,14 @@ SystemTray &SystemTray::getInstance()
     return instance;
 }
 
-bool SystemTray::init(HINSTANCE hInstance, PairCallback onPair, ExitCallback onExit, InstallDriverCallback onInstallDriver)
+bool SystemTray::init(HINSTANCE hInstance, PairCallback onPair, ExitCallback onExit, 
+                      InstallDriverCallback onInstallDriver, SettingsCallback onSettings)
 {
     g_onPair = std::move(onPair);
     g_onExit = std::move(onExit);
     g_onInstallDriver = std::move(onInstallDriver);
+    if (onSettings)
+        g_onSettings = std::move(onSettings);
 
     WNDCLASSEXW wc = {};
     wc.cbSize = sizeof(WNDCLASSEXW);
@@ -780,6 +757,11 @@ void SystemTray::setPowerChangeCallback(PowerChangeCallback callback)
     g_onPowerChange = std::move(callback);
 }
 
+void SystemTray::setSettingsCallback(SettingsCallback callback)
+{
+    g_onSettings = std::move(callback);
+}
+
 void SystemTray::updateDriverState(DriverUiState state)
 {
     std::lock_guard<std::mutex> lock(g_trayStateMutex);
@@ -802,6 +784,12 @@ void SystemTray::updateDriverState(DriverUiState state)
         g_dongleActive = true;
         tip = L"xwa-arm64: Dongle active (listening for controllers)";
     }
+    else if (state == DriverUiState::ControllerConnected)
+    {
+        g_dongleActive = true;
+        g_controllerConnected = true;
+        tip = L"xwa-arm64: Controller connected";
+    }
     wcsncpy_s(g_nid.szTip, tip.c_str(), sizeof(g_nid.szTip) / sizeof(wchar_t) - 1);
     Shell_NotifyIconW(NIM_MODIFY, &g_nid);
 }
@@ -818,6 +806,22 @@ void SystemTray::updateStatus(bool dongleActive, bool controllerConnected, const
     g_controllerConnected = controllerConnected;
     g_batteryLevel = batteryLevel;
 
+    if (controllerConnected)
+    {
+        g_driverUiState = DriverUiState::ControllerConnected;
+    }
+    else if (dongleActive)
+    {
+        if (g_driverUiState != DriverUiState::DriverMissing)
+        {
+            g_driverUiState = DriverUiState::Active;
+        }
+    }
+    else if (g_driverUiState != DriverUiState::DriverMissing)
+    {
+        g_driverUiState = DriverUiState::WaitingUnplugged;
+    }
+
     std::wstring tip = L"xwa-arm64: Xbox Wireless Adapter (ARM64)";
     if (controllerConnected)
     {
@@ -833,13 +837,39 @@ void SystemTray::updateStatus(bool dongleActive, bool controllerConnected, const
     Shell_NotifyIconW(NIM_MODIFY, &g_nid);
 }
 
+TrayStatusSnapshot SystemTray::getStatusSnapshot() const
+{
+    std::lock_guard<std::mutex> lock(g_trayStateMutex);
+    TrayStatusSnapshot snap;
+    snap.driverState = g_driverUiState;
+    snap.dongleActive = g_dongleActive;
+    snap.controllerConnected = g_controllerConnected;
+    snap.batteryLevel = g_batteryLevel;
+    return snap;
+}
+
 void SystemTray::showSettingsDialog()
+{
+    // If an ImGui settings callback is registered, delegate to it
+    if (g_onSettings)
+    {
+        g_onSettings();
+        return;
+    }
+
+    // Fallback: legacy Win32 dialog (if no ImGui renderer available)
+    showLegacySettingsDialog();
+}
+
+void SystemTray::showLegacySettingsDialog()
 {
     if (g_hSettingsWnd)
     {
         SetForegroundWindow(g_hSettingsWnd);
         return;
     }
+
+    ScopedThreadDpiContext gdiDpiGuard(-5); // UNAWARE_GDISCALED for fixed-pixel GDI controls
 
     int width = 545;
     int height = 585;
